@@ -1,0 +1,7 @@
+export { default as Header } from './Header.vue'
+export { default as BottomNav } from './BottomNav.vue'
+export { default as NewsList } from './NewsList.vue'
+export { default as NewsItem } from './NewsItem.vue'
+export { default as SearchBar } from './SearchBar.vue'
+export { default as CategoryTabs } from './CategoryTabs.vue'
+export { default as Avatar } from './Avatar.vue'

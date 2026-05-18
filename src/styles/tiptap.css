@@ -1,0 +1,154 @@
+/* Tiptap 富文本样式 */
+
+/* 基础容器 */
+.tiptap {
+  min-height: 300px;
+  font-size: 17px;
+  line-height: 1.8;
+  text-align: justify;
+  color: #333333;
+}
+
+/* 段落 */
+.tiptap p {
+  margin-bottom: 1.5em;
+  text-indent: 2em;
+}
+
+.tiptap p:last-child {
+  margin-bottom: 0;
+}
+
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #9ca3af;
+  pointer-events: none;
+  height: 0;
+}
+
+/* 标题 */
+.tiptap h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 2em 0 1em;
+  color: #1A1A1A;
+  text-indent: 0;
+}
+
+.tiptap h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 2em 0 1em;
+  color: #1A1A1A;
+  text-indent: 0;
+}
+
+.tiptap h3 {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 1.5em 0 0.75em;
+  color: #1A1A1A;
+  text-indent: 0;
+}
+
+/* 文本样式 */
+.tiptap strong {
+  font-weight: 600;
+  color: #000000;
+}
+
+.tiptap em {
+  font-style: italic;
+  color: #333333;
+}
+
+/* 列表 */
+.tiptap ul,
+.tiptap ol {
+  margin: 1em 0;
+  padding-left: 2em;
+  text-indent: 0;
+}
+
+.tiptap ul {
+  list-style-type: disc;
+}
+
+.tiptap ol {
+  list-style-type: decimal;
+}
+
+.tiptap li {
+  margin-bottom: 0.5em;
+  display: list-item;
+}
+
+/* 引用 */
+.tiptap blockquote {
+  border-left: 3px solid #d1d5db;
+  padding-left: 1rem;
+  color: #6b7280;
+  margin: 1em 0;
+  text-indent: 0;
+}
+
+/* 代码 */
+.tiptap code {
+  background-color: #f3f4f6;
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.25rem;
+  font-size: 0.875rem;
+}
+
+.tiptap pre {
+  background-color: #1f2937;
+  color: #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  margin: 1em 0;
+  overflow-x: auto;
+  text-indent: 0;
+}
+
+.tiptap pre code {
+  background-color: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+/* 分割线 */
+.tiptap hr {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin: 1rem 0;
+}
+
+/* 图片 */
+.tiptap img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 1em 0;
+}
+
+/* 链接 */
+.tiptap a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.tiptap a:hover {
+  color: #1d4ed8;
+}
+
+/* 视频 */
+.tiptap .video-container {
+  margin: 1em 0;
+}
+
+.tiptap video {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
