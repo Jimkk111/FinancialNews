@@ -2,6 +2,8 @@
 
 基于 Vue 3 + TypeScript + Vite 构建的财经新闻平台前端，提供新闻浏览、搜索、收藏、AI 助手、富文本编辑器等功能。
 
+后端仓库：[FinancialNews-Backend](https://github.com/Jimkk111/FinancialNews-Backend.git)
+
 ## 技术栈
 
 | 类别 | 技术 |
