@@ -92,28 +92,34 @@ export const useAiSessionStore = defineStore('aiSession', () => {
     }
   }
 
+  function normalizeSession(s: any): SessionInfo {
+    return {
+      sessionId: s.sessionId || s.session_id || s.id || '',
+      title: s.title || '未命名会话',
+      createdAt: s.createdAt || s.created_at || new Date().toISOString(),
+      updatedAt: s.updatedAt || s.updated_at || new Date().toISOString()
+    }
+  }
+
   async function loadSessions() {
     try {
-      const data = await getSessions()
-      sessions.value = data
+      const data = await getSessions() as any
+      const rawSessions = Array.isArray(data) ? data : (data?.sessions || data?.data || [])
+      sessions.value = rawSessions.map(normalizeSession)
 
-      const cached = JSON.stringify(data.map(s => ({
-        sessionId: s.sessionId,
-        title: s.title || '未命名会话',
-        updatedAt: s.updatedAt
-      })))
-      localStorage.setItem('aiAssistantConversations', cached)
+      localStorage.setItem('aiAssistantConversations', JSON.stringify(
+        sessions.value.map(s => ({
+          sessionId: s.sessionId,
+          title: s.title,
+          updatedAt: s.updatedAt
+        }))
+      ))
     } catch {
       const cachedConversations = localStorage.getItem('aiAssistantConversations')
       if (cachedConversations) {
         try {
           const parsed = JSON.parse(cachedConversations)
-          sessions.value = parsed.map((s: any) => ({
-            sessionId: s.sessionId,
-            title: s.title || '未命名会话',
-            createdAt: s.createdAt || new Date().toISOString(),
-            updatedAt: s.updatedAt || new Date().toISOString()
-          }))
+          sessions.value = parsed.map(normalizeSession)
         } catch {
           sessions.value = []
         }
@@ -121,38 +127,12 @@ export const useAiSessionStore = defineStore('aiSession', () => {
     }
   }
 
-  async function createNewSession(): Promise<string | null> {
-    if (currentSessionId.value && messages.value.length === 0) {
-      return currentSessionId.value
-    }
-
-    try {
-      isLoading.value = true
-      error.value = null
-
-      const healthy = await checkHealth()
-      if (!healthy) {
-        error.value = '后端服务不可用，请检查服务是否运行'
-        return null
-      }
-
-      const sessionId = await createSession()
-      if (!sessionId) {
-        error.value = '创建新会话失败，未获取到会话ID'
-        return null
-      }
-      currentSessionId.value = sessionId
-      messages.value = []
-      localStorage.setItem('aiAssistantLastSessionId', sessionId)
-
-      await loadSessions()
-      return sessionId
-    } catch {
-      error.value = '创建新会话失败，请重试'
-      return null
-    } finally {
-      isLoading.value = false
-    }
+  function createNewSession() {
+    if (isSending.value) return
+    currentSessionId.value = null
+    messages.value = []
+    error.value = null
+    localStorage.removeItem('aiAssistantLastSessionId')
   }
 
   async function selectSession(sessionId: string) {
@@ -160,7 +140,10 @@ export const useAiSessionStore = defineStore('aiSession', () => {
       isLoading.value = true
       error.value = null
 
-      const sessionMessages = await getSessionMessages(sessionId)
+      const rawMessages = await getSessionMessages(sessionId) as any
+      const sessionMessages: ChatMessage[] = Array.isArray(rawMessages)
+        ? rawMessages
+        : (rawMessages?.messages || rawMessages?.data || [])
 
       const formattedMessages: Message[] = sessionMessages.map((msg, index) => ({
         id: `${sessionId}-${index}`,
@@ -175,7 +158,8 @@ export const useAiSessionStore = defineStore('aiSession', () => {
       sidebarOpen.value = false
 
       localStorage.setItem('aiAssistantLastSessionId', sessionId)
-    } catch {
+    } catch (e) {
+      console.error('selectSession failed:', e)
       error.value = '加载会话失败，请重试'
     } finally {
       isLoading.value = false
@@ -233,16 +217,25 @@ export const useAiSessionStore = defineStore('aiSession', () => {
     error.value = null
 
     let sessionIdValue = currentSessionId.value
-    let aiMessageId = `ai-${Date.now()}`
+    const aiMessageId = `ai-${Date.now()}`
     let currentContent = ''
     let hasCreatedMessage = false
 
     try {
+      // 唯一的会话创建入口：发消息时才创建会话
       if (!sessionIdValue) {
+        isLoading.value = true
         const newSessionId = await createSession()
+        if (!newSessionId) {
+          error.value = '创建会话失败，请重试'
+          messages.value = messages.value.filter(m => m.id !== userMessage.id)
+          return
+        }
         sessionIdValue = newSessionId
         currentSessionId.value = newSessionId
         localStorage.setItem('aiAssistantLastSessionId', newSessionId)
+        await loadSessions()
+        isLoading.value = false
       }
 
       const chatMessages: ChatMessage[] = messages.value
@@ -260,14 +253,13 @@ export const useAiSessionStore = defineStore('aiSession', () => {
           currentContent += chunk
 
           if (!hasCreatedMessage) {
-            const aiMessage: Message = {
+            messages.value = [...messages.value, {
               id: aiMessageId,
               role: 'assistant',
               content: currentContent,
               timestamp: new Date(),
               status: 'streaming'
-            }
-            messages.value = [...messages.value, aiMessage]
+            }]
             hasCreatedMessage = true
           } else {
             messages.value = messages.value.map(msg =>
@@ -291,25 +283,22 @@ export const useAiSessionStore = defineStore('aiSession', () => {
             : msg
         )
       } else {
-        const aiMessage: Message = {
+        messages.value = [...messages.value, {
           id: aiMessageId,
           role: 'assistant',
           content: response.content || 'AI暂无回应',
           timestamp: new Date(),
           status: 'complete'
-        }
-        messages.value = [...messages.value, aiMessage]
+        }]
       }
 
       await loadSessions()
     } catch {
-      if (hasCreatedMessage) {
-        messages.value = messages.value.slice(0, -1)
-      }
-      messages.value = messages.value.slice(0, -1)
+      messages.value = messages.value.filter(m => m.id !== userMessage.id && m.id !== aiMessageId)
       error.value = '发送消息失败，请重试'
     } finally {
       isSending.value = false
+      isLoading.value = false
     }
   }
 
@@ -340,14 +329,27 @@ export const useAiSessionStore = defineStore('aiSession', () => {
       return
     }
 
-    localStorage.removeItem('aiAssistantConversations')
     await loadSessions()
 
-    const lastSessionId = localStorage.getItem('aiAssistantLastSessionId')
-    if (lastSessionId) {
+    let targetSessionId = localStorage.getItem('aiAssistantLastSessionId')
+
+    // 过滤掉旧代码可能写入的无效值
+    if (!targetSessionId || targetSessionId === 'undefined' || targetSessionId === 'null') {
+      targetSessionId = null
+    }
+
+    if (!targetSessionId && sessions.value.length > 0) {
+      targetSessionId = sessions.value[0]!.sessionId
+      if (targetSessionId) {
+        localStorage.setItem('aiAssistantLastSessionId', targetSessionId)
+      }
+    }
+
+    if (targetSessionId) {
       try {
-        await selectSession(lastSessionId)
-      } catch {
+        await selectSession(targetSessionId)
+      } catch (e) {
+        console.error('selectSession failed:', e)
         currentSessionId.value = null
         messages.value = []
         localStorage.removeItem('aiAssistantLastSessionId')

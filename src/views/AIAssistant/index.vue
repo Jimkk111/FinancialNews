@@ -47,7 +47,7 @@ onMounted(() => {
 
         <button
           @click="handleNewConversation"
-          :disabled="store.isLoading"
+          :disabled="store.isLoading || store.isSending"
           class="p-2 -mr-2 hover:bg-white/20 rounded-full transition-colors active:scale-95 disabled:opacity-50"
         >
           <Loader2 v-if="store.isLoading" :size="18" class="animate-spin" />
@@ -78,6 +78,7 @@ onMounted(() => {
         <InputArea
           :disabled="!store.isServiceHealthy"
           :is-sending="store.isSending"
+          :is-loading="store.isLoading"
           @send="handleSend"
         />
       </div>

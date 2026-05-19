@@ -1,3 +1,10 @@
+<!-- 
+  问题1：类型管理混乱，接口定义分布于不同的文件
+  问题2：没有统一管理Axios实例和拦截器
+  问题3：样式平庸
+  问题4：只有一级路由，并且一级路由管理过多路由实例
+-->
+
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
@@ -22,7 +29,7 @@ import {
 } from '@/services/userService'
 import { formatTime } from '@/utils/format'
 import { useAuthStore } from '@/stores/auth'
-import type { NewsDetail as NewsType, NewsItem } from '@/types'
+import type { NewsDetail as NewsType, NewsItem ,IResponseNewsDetail} from '@/types'
 
 const router = useRouter()
 const route = useRoute()
@@ -31,7 +38,7 @@ const authStore = useAuthStore()
 const newsId = ref(Number(route.params.id))
 const displayId = authStore.user?.displayId || ''
 
-const news = ref<NewsType | null>(null)
+const news = ref<IResponseNewsDetail | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 const isFavorited = ref(false)
@@ -44,10 +51,10 @@ const addNewsHistory = async () => {
 
   try {
     await addHistory(newsId.value, {
-      title: news.value.title,
-      source: news.value.source,
-      publish_time: news.value.publishTime,
-      views: news.value.views,
+      title: news.value.data.title,
+      source: news.value.data.source,
+      publish_time: news.value.data.publishTime,
+      views: news.value.data.views,
     })
   } catch (err) {
     console.error('添加历史记录失败:', err)
@@ -82,10 +89,10 @@ const toggleFavorite = async () => {
       }
     } else {
       const response = await addFavorite(newsId.value, {
-        title: news.value.title,
-        source: news.value.source,
-        publish_time: news.value.publishTime,
-        views: news.value.views,
+        title: news.value.data.title,
+        source: news.value.data.source,
+        publish_time: news.value.data.publishTime,
+        views: news.value.data.views,
       })
       if (response.success) {
         isFavorited.value = true
@@ -112,8 +119,8 @@ const handleShare = async () => {
   if (!news.value) return
 
   const shareData = {
-    title: news.value.title,
-    text: news.value.summary,
+    title: news.value.data.title,
+    text: news.value.data.summary,
     url: window.location.href,
   }
 
@@ -182,8 +189,9 @@ const fetchNewsDetail = async () => {
   try {
     loading.value = true
     error.value = null
-    const newsDetail = await getNewsDetail(newsId.value)
-    news.value = newsDetail
+    const res = await getNewsDetail(newsId.value)
+    news.value = res 
+    console.log(res)
 
     try {
       await incrementNewsViews(newsId.value)
@@ -194,7 +202,7 @@ const fetchNewsDetail = async () => {
     await addNewsHistory()
     await checkFavoritedStatus()
     
-    await loadRelatedNews(newsDetail)
+    await loadRelatedNews(news.value.data)  
   } catch (err) {
     error.value = '获取新闻详情失败，请稍后重试'
     console.error('获取新闻详情失败:', err)
@@ -283,18 +291,18 @@ onUnmounted(() => {
     <main class="pt-14 max-w-3xl mx-auto">
       <div class="bg-card px-4 py-5">
         <h1 class="text-[20px] font-bold text-foreground mb-4 leading-tight">
-          {{ news.title }}
+          {{ news.data.title }}
         </h1>
 
         <div class="flex items-center gap-4 text-xs text-muted-foreground mb-3">
-          <span class="text-brand font-medium">{{ news.source }}</span>
+          <span class="text-brand font-medium">{{ news.data.source }}</span>
           <div class="flex items-center gap-1">
             <Clock :size="12" />
-            <span>{{ formatTime(news.publishTime) }}</span>
+            <span>{{ formatTime(news.data.publishTime) }}</span>
           </div>
           <div class="flex items-center gap-1">
             <Eye :size="12" />
-            <span>{{ news.views }} 阅读</span>
+            <span>{{ news.data.views }} 阅读</span>
           </div>
         </div>
       </div>
@@ -302,14 +310,14 @@ onUnmounted(() => {
       <article class="bg-card px-4 py-5 mt-2">
         <div
           class="tiptap text-foreground"
-          v-html="formatContent(news.content)"
+          v-html="formatContent(news.data.content)"
         />
       </article>
 
-      <div v-if="news.tags && news.tags.length > 0" class="bg-card px-4 py-4 mt-2">
+      <div v-if="news.data.tags && news.data.tags.length > 0" class="bg-card px-4 py-4 mt-2">
         <div class="flex flex-wrap gap-2">
           <span
-            v-for="tag in news.tags"
+            v-for="tag in news.data.tags" 
             :key="tag.id"
             class="px-3 py-1 bg-muted text-foreground text-sm rounded-full"
           >

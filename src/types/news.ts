@@ -8,6 +8,10 @@ export interface Tag {
   name: string
 }
 
+export interface IResponseNewsDetail {
+  data: NewsDetail
+}
+
 export interface NewsItem {
   id: number
   title: string

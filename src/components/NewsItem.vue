@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { reactive} from 'vue'
 import { Clock } from 'lucide-vue-next'
 import { formatViews } from '@/utils/format'
+
 
 interface Props {
   id: number
@@ -10,10 +12,12 @@ interface Props {
   views: number
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
 const emit = defineEmits<{
   click: [id: number]
 }>()
+
+
 </script>
 
 <template>

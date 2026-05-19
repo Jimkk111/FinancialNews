@@ -6,8 +6,9 @@ import type {
 } from '@/types'
 import * as newsApi from '@/api/news'
 import type { PaginatedResponse } from '@/api/request'
+import type { IResponseNewsDetail } from '@/types/news'
 
-export type { Category, Tag, NewsItem, NewsDetail }
+export type { Category, Tag, NewsItem, NewsDetail,IResponseNewsDetail }
 
 export async function getNewsList(
   page: number = 1,
@@ -23,7 +24,7 @@ export async function getNewsList(
   })
 }
 
-export async function getNewsDetail(newsId: number): Promise<NewsDetail> {
+export async function getNewsDetail(newsId: number): Promise<IResponseNewsDetail> {
   return newsApi.getNewsDetail(newsId)
 }
 

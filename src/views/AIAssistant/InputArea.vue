@@ -5,6 +5,7 @@ import { Send, Loader2 } from 'lucide-vue-next'
 const props = defineProps<{
   disabled: boolean
   isSending: boolean
+  isLoading: boolean
 }>()
 
 const emit = defineEmits<{
@@ -26,7 +27,7 @@ function adjustHeight() {
 watch(inputValue, adjustHeight)
 
 function handleSend() {
-  if (inputValue.value.trim() && !props.disabled && !props.isSending) {
+  if (inputValue.value.trim() && !props.disabled && !props.isSending && !props.isLoading) {
     emit('send', inputValue.value)
     inputValue.value = ''
     nextTick(() => {
@@ -54,7 +55,7 @@ function handleKeydown(e: KeyboardEvent) {
             ref="textareaRef"
             v-model="inputValue"
             :placeholder="disabled ? '后端服务不可用' : '输入您的问题...'"
-            :disabled="disabled || isSending"
+            :disabled="disabled || isSending || isLoading"
             class="w-full bg-transparent text-sm resize-none outline-none max-h-24 text-foreground placeholder:text-muted-foreground disabled:opacity-50"
             rows="1"
             style="line-height: 1.5"
@@ -63,7 +64,7 @@ function handleKeydown(e: KeyboardEvent) {
         </div>
         <button
           @click="handleSend"
-          :disabled="!inputValue.trim() || disabled || isSending"
+          :disabled="!inputValue.trim() || disabled || isSending || isLoading"
           :class="[
             'p-2.5 rounded-full transition-all active:scale-95',
             inputValue.trim() && !disabled && !isSending

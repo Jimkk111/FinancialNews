@@ -1,5 +1,5 @@
 import { get, getPaginated, post } from './request'
-import type { NewsItem, NewsDetail, Category, Tag } from '@/types'
+import type { NewsItem, NewsDetail, Category, Tag ,IResponseNewsDetail} from '@/types'
 import type { PaginatedResponse } from './request'
 
 export async function getNewsList(params: {
@@ -11,8 +11,8 @@ export async function getNewsList(params: {
   return getPaginated<NewsItem>('/news', { params })
 }
 
-export async function getNewsDetail(id: number): Promise<NewsDetail> {
-  return get<NewsDetail>(`/news/${id}`)
+export async function getNewsDetail(id: number): Promise<IResponseNewsDetail> {
+  return get<IResponseNewsDetail>(`/news/${id}`)
 }
 
 export async function incrementViews(id: number): Promise<{ views: number }> {
