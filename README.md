@@ -48,7 +48,7 @@
 - 新闻收藏（添加/取消），收藏列表分页浏览
 - 浏览历史自动记录，支持清空
 
-![收藏页](public/images/收藏页png)
+![收藏页](public/images/收藏页.png)
 
 ![历史记录页](public/images/历史记录页.png)
 
