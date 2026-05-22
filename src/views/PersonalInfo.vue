@@ -10,7 +10,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const username = computed(() => authStore.user?.username || '')
-const displayId = computed(() => authStore.user?.displayId || '')
+const uid = computed(() => authStore.user?.uid || '')
 const email = computed(() => authStore.user?.email || '')
 const avatar = computed(() => authStore.user?.avatar || null)
 
@@ -145,7 +145,7 @@ const handleLogout = () => {
         <div class="space-y-4">
           <div class="flex justify-between items-center py-3 border-b border-border">
             <span class="text-muted-foreground">ID</span>
-            <span class="text-foreground font-medium">{{ displayId }}</span>
+            <span class="text-foreground font-medium">{{ uid }}</span>
           </div>
           <div class="flex justify-between items-center py-3 border-b border-border">
             <span class="text-muted-foreground">用户名</span>

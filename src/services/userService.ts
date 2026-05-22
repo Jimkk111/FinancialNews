@@ -21,8 +21,8 @@ export async function login(
   credentials: LoginRequest
 ): Promise<ApiResponse<LoginResponse>> {
   try {
-    const data = await authApi.login(credentials)
-    return { success: true, data }
+    const response = await authApi.login(credentials)
+    return { success: true, data: response.data }
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '登录失败'
     return {
@@ -36,8 +36,8 @@ export async function register(
   userData: RegisterRequest
 ): Promise<ApiResponse<LoginResponse>> {
   try {
-    const data = await authApi.register(userData)
-    return { success: true, data }
+    const response = await authApi.register(userData)
+    return { success: true, data: response.data }
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '注册失败'
     return {

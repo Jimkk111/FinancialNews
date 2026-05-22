@@ -84,6 +84,10 @@ watch(() => props.categoryId, () => {
   nextTick(() => setupObserver())
 })
 
+
+/* 
+  observer的作用是监听是否到达了页面底部，动态增加页数从而加载数据。
+*/
 watch(page, (newPage) => {
   if (newPage > 1) {
     fetchNews()
@@ -140,6 +144,10 @@ onUnmounted(() => {
       <p class="text-muted-foreground/70 text-sm mt-2">请尝试选择其他分类</p>
     </div>
 
+
+<!-- 虚拟列表容器
+     作用是只渲染可视区域内的DOM结点，而不是渲染全部列表项。
+-->
     <DynamicScroller
       v-else
       :items="newsData"
@@ -148,6 +156,7 @@ onUnmounted(() => {
       page-mode
     >
       <template #default="{ item, active }">
+        <!-- 虚拟列表子项包装器 -->
         <DynamicScrollerItem
           :item="item"
           :active="active"

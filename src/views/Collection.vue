@@ -10,7 +10,7 @@ import type { NewsItem, PaginationInfo } from '@/types'
 const router = useRouter()
 const authStore = useAuthStore()
 
-const displayId = authStore.user?.displayId || ''
+const uid = authStore.user?.uid || ''
 
 const handleBack = () => {
   router.push('/profile')
@@ -38,7 +38,7 @@ const state = reactive<{
 })
 
 const fetchFavorites = async () => {
-  if (!displayId) {
+  if (!uid) {
     state.loading = false
     state.error = '用户未登录'
     return
@@ -72,7 +72,7 @@ const fetchFavorites = async () => {
 const handleRemoveFavorite = async (newsId: number, e: Event) => {
   e.stopPropagation()
 
-  if (!displayId) return
+  if (!uid) return
 
   try {
     const response = await removeFavorite(newsId)
@@ -88,7 +88,7 @@ const handleRemoveFavorite = async (newsId: number, e: Event) => {
   }
 }
 
-watch(() => displayId, fetchFavorites)
+watch(() => uid, fetchFavorites)
 watch(() => state.pagination.page, fetchFavorites)
 
 onMounted(fetchFavorites)

@@ -18,8 +18,8 @@ const emit = defineEmits<{
 const fetchCategories = async () => {
   try {
     loading.value = true
-    const categoriesList = await getNewsCategories()
-    categories.value = categoriesList
+    const response = await getNewsCategories()
+    categories.value = (response as any).data ?? response
   } catch (error) {
     // 静默处理错误，保持 UI 稳定性
   } finally {

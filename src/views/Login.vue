@@ -53,6 +53,7 @@ const handleSubmit = async (e: Event) => {
     }
   } catch (err) {
     error.value = '登录失败，请稍后重试'
+    console.error(err)
   } finally {
     loading.value = false
   }

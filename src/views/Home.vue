@@ -15,6 +15,7 @@ const handleNewsClick = (id: number) => {
 }
 
 const handleSearch = (keyword: string) => {
+  // 通过url传递参数给搜索页面
   router.push({ name: 'searchResults', query: { q: keyword } })
 }
 

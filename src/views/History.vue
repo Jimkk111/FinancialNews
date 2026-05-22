@@ -10,7 +10,7 @@ import type { NewsItem, PaginationInfo } from '@/types'
 const router = useRouter()
 const authStore = useAuthStore()
 
-const displayId = authStore.user?.displayId || ''
+const uid = authStore.user?.uid || ''
 
 const handleBack = () => {
   router.push('/profile')
@@ -38,7 +38,7 @@ const state = reactive<{
 })
 
 const fetchHistory = async () => {
-  if (!displayId) {
+  if (!uid) {
     state.loading = false
     state.error = '用户未登录'
     return
@@ -69,7 +69,7 @@ const fetchHistory = async () => {
   }
 }
 
-watch(() => displayId, fetchHistory)
+watch(() => uid, fetchHistory)
 watch(() => state.pagination.page, fetchHistory)
 
 onMounted(fetchHistory)

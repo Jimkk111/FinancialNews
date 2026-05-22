@@ -15,14 +15,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     if (token && storedUser) {
       try {
-        const parsedUser = JSON.parse(storedUser)
-        // 映射id字段到displayId字段
-        user.value = {
-          ...parsedUser,
-          displayId: parsedUser.displayId || parsedUser.id || parsedUser.uid,
-          createdAt: parsedUser.createdAt || new Date().toISOString(),
-          updatedAt: parsedUser.updatedAt || new Date().toISOString()
-        }
+        user.value = JSON.parse(storedUser)
       } catch {
         localStorage.removeItem('user_info')
         localStorage.removeItem('access_token')
@@ -32,16 +25,9 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function login(token: string, userInfo: UserInfo) {
-    // 确保用户信息包含displayId字段
-    const processedUserInfo = {
-      ...userInfo,
-      displayId: userInfo.displayId || userInfo.id || userInfo.uid,
-      createdAt: userInfo.createdAt || new Date().toISOString(),
-      updatedAt: userInfo.updatedAt || new Date().toISOString()
-    }
     localStorage.setItem('access_token', token)
-    localStorage.setItem('user_info', JSON.stringify(processedUserInfo))
-    user.value = processedUserInfo
+    localStorage.setItem('user_info', JSON.stringify(userInfo))
+    user.value = userInfo
   }
 
   async function logout() {
@@ -56,15 +42,8 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function updateUser(userInfo: UserInfo) {
-    // 确保用户信息包含displayId字段
-    const processedUserInfo = {
-      ...userInfo,
-      displayId: userInfo.displayId || userInfo.id || userInfo.uid,
-      createdAt: userInfo.createdAt || new Date().toISOString(),
-      updatedAt: userInfo.updatedAt || new Date().toISOString()
-    }
-    localStorage.setItem('user_info', JSON.stringify(processedUserInfo))
-    user.value = processedUserInfo
+    localStorage.setItem('user_info', JSON.stringify(userInfo))
+    user.value = userInfo
   }
 
   init()

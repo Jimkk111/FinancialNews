@@ -36,7 +36,7 @@ const route = useRoute()
 const authStore = useAuthStore()
 
 const newsId = ref(Number(route.params.id))
-const displayId = authStore.user?.displayId || ''
+const uid = authStore.user?.uid || ''
 
 const news = ref<IResponseNewsDetail | null>(null)
 const loading = ref(true)
@@ -47,7 +47,7 @@ const menuOpen = ref(false)
 const relatedNews = ref<NewsItem[]>([])
 
 const addNewsHistory = async () => {
-  if (!displayId || !news.value) return
+  if (!uid || !news.value) return
 
   try {
     await addHistory(newsId.value, {
@@ -62,7 +62,7 @@ const addNewsHistory = async () => {
 }
 
 const checkFavoritedStatus = async () => {
-  if (!displayId) return
+  if (!uid) return
 
   try {
     const response = await checkFavorite(newsId.value)
@@ -75,7 +75,7 @@ const checkFavoritedStatus = async () => {
 }
 
 const toggleFavorite = async () => {
-  if (!displayId || favoriting.value || !news.value) return
+  if (!uid || favoriting.value || !news.value) return
 
   favoriting.value = true
 
@@ -264,7 +264,7 @@ onUnmounted(() => {
             <button
               @click="toggleFavorite(); closeMenu()"
               class="w-full flex items-center gap-3 px-4 py-2 hover:bg-muted transition-colors"
-              :disabled="!displayId || favoriting"
+              :disabled="!uid || favoriting"
             >
               <Heart
                 :size="20"

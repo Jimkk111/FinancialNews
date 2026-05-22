@@ -1,12 +1,9 @@
 export interface UserInfo {
+  id: number
   uid: string
-  displayId: string
   username: string
   email: string
-  avatar: string | null
-  createdAt: string
-  updatedAt: string
-  id?: string
+  avatar: string
 }
 
 export interface RegisterRequest {

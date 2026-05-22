@@ -31,7 +31,7 @@
 
 - **分类与标签**：按分类浏览，标签聚合
 
-  ![77937767582](C:\Users\momo\AppData\Local\Temp\1779377675822.png)
+  ![首页](public/images/Home.png)
 
 ### 用户系统
 
@@ -41,16 +41,16 @@
 
 - 401 自动清除本地状态
 
-  ![77937779555](C:\Users\momo\AppData\Local\Temp\1779377795554.png)
+  ![登录页](public/images/登录页.png)
 
 ### 收藏与历史
 
 - 新闻收藏（添加/取消），收藏列表分页浏览
 - 浏览历史自动记录，支持清空
 
-![77941613717](C:\Users\momo\AppData\Local\Temp\1779416137178.png)
+![收藏页](public/images/收藏页png)
 
-![77941607870](C:\Users\momo\AppData\Local\Temp\1779416078708.png)
+![历史记录页](public/images/历史记录页.png)
 
 ### AI 助手
 
@@ -58,9 +58,9 @@
 - 流式响应的聊天体验（SSE）
 - 快捷操作入口
 
-![77941621474](C:\Users\momo\AppData\Local\Temp\1779416214749.png)
+![AI助手](public/images/AI助手.png)
 
-![77941626058](C:\Users\momo\AppData\Local\Temp\1779416260583.png)
+![AI历史会话列表](public/images/AI历史会话列表.png)
 
 ### 新闻编辑器
 
@@ -69,14 +69,14 @@
 - **发布管理**：发布新闻、查看已发布列表
 - **媒体上传**：图片和视频上传
 
-![77941638899](C:\Users\momo\AppData\Local\Temp\1779416388994.png)
+![新闻编辑页](public/images/新闻编辑页.png)
 
 ### 深色模式
 
 - 支持亮色/暗色/跟随系统三种模式
 - 页面刷新不闪烁（inline script 预判）
 
-![77941641717](C:\Users\momo\AppData\Local\Temp\1779416417173.png)
+![暗色模式](public/images/暗色模式.png)
 
 ## 项目结构
 

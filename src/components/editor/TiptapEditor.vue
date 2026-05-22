@@ -85,9 +85,11 @@ const editor = useEditor({
     },
     // 中文输入过程只触发一次onUpdate
     handleDOMEvents: {
+      // 组合事件开始
       compositionstart: () => {
         isComposing.value = true
       },
+      // 组合事件结束
       compositionend: () => {
         isComposing.value = false
       },
