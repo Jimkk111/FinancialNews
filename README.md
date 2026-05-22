@@ -26,25 +26,31 @@
 ### 新闻浏览
 
 - **首页推荐**：新闻列表支持分类筛选（最新/热门）
+
 - **详情页**：完整正文、来源、发布时间，支持 Markdown 渲染
+
 - **分类与标签**：按分类浏览，标签聚合
 
-![首页](path/to/screenshot-home.png)
+  ![77937767582](C:\Users\momo\AppData\Local\Temp\1779377675822.png)
 
 ### 用户系统
 
 - 注册/登录，支持验证码发送和密码重置
+
 - JWT Token 认证，自动注入请求头
+
 - 401 自动清除本地状态
 
-![登录](path/to/screenshot-login.png)
+  ![77937779555](C:\Users\momo\AppData\Local\Temp\1779377795554.png)
 
 ### 收藏与历史
 
 - 新闻收藏（添加/取消），收藏列表分页浏览
 - 浏览历史自动记录，支持清空
 
-![收藏](path/to/screenshot-collection.png)
+![77941613717](C:\Users\momo\AppData\Local\Temp\1779416137178.png)
+
+![77941607870](C:\Users\momo\AppData\Local\Temp\1779416078708.png)
 
 ### AI 助手
 
@@ -52,7 +58,9 @@
 - 流式响应的聊天体验（SSE）
 - 快捷操作入口
 
-![AI助手](path/to/screenshot-ai.png)
+![77941621474](C:\Users\momo\AppData\Local\Temp\1779416214749.png)
+
+![77941626058](C:\Users\momo\AppData\Local\Temp\1779416260583.png)
 
 ### 新闻编辑器
 
@@ -61,14 +69,14 @@
 - **发布管理**：发布新闻、查看已发布列表
 - **媒体上传**：图片和视频上传
 
-![编辑器](path/to/screenshot-editor.png)
+![77941638899](C:\Users\momo\AppData\Local\Temp\1779416388994.png)
 
 ### 深色模式
 
 - 支持亮色/暗色/跟随系统三种模式
 - 页面刷新不闪烁（inline script 预判）
 
-![深色模式](path/to/screenshot-dark.png)
+![77941641717](C:\Users\momo\AppData\Local\Temp\1779416417173.png)
 
 ## 项目结构
 
