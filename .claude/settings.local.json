@@ -4,7 +4,9 @@
       "WebSearch",
       "Bash(npm install:*)",
       "Bash(cc-connect --version)",
-      "Bash(claude --version)"
+      "Bash(claude --version)",
+      "Bash(npx vue-tsc *)",
+      "Bash(npx vite *)"
     ]
   }
 }
