@@ -1,4 +1,4 @@
-import request, { get, post, put, del } from './request'
+import { get, post, put, del, resolveUrl, getAuthHeaders } from './request'
 import type { ChatMessage, SessionInfo } from '@/types'
 
 export async function createSession(): Promise<{ session_id: string }> {
@@ -42,15 +42,14 @@ export function createStreamingChat(
 ): () => void {
   const controller = new AbortController()
 
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
-  const url = `${baseUrl}/ai/chat`
-  const token = localStorage.getItem('access_token')
-  
+  const url = resolveUrl('/ai/chat')
+  const authHeaders = getAuthHeaders()
+
   fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: token ? `Bearer ${token}` : '',
+      ...authHeaders,
     },
     body: JSON.stringify({
       messages,

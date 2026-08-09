@@ -51,49 +51,29 @@ export async function deletePublishedNews(id: number): Promise<MessageResponse> 
 export async function uploadImage(file: File): Promise<{ url: string; filename: string }> {
   const formData = new FormData()
   formData.append('image', file)
-  
-  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/upload/image`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem('access_token')}`,
-    },
-    body: formData,
-  })
-  
-  if (!response.ok) {
-    throw new Error('上传失败')
-  }
-  
-  const result = await response.json()
-  
+  // axios 自动识别 FormData 并设置正确的 Content-Type（含 boundary）
+  const result = await post<{
+    success: boolean
+    data: { url: string; filename: string }
+    error?: { message?: string }
+  }>('/upload/image', formData)
   if (!result.success) {
     throw new Error(result.error?.message || '上传失败')
   }
-  
   return result.data
 }
 
 export async function uploadVideo(file: File): Promise<{ url: string; filename: string }> {
   const formData = new FormData()
   formData.append('video', file)
-  
-  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/upload/video`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem('access_token')}`,
-    },
-    body: formData,
-  })
-  
-  if (!response.ok) {
-    throw new Error('上传失败')
-  }
-  
-  const result = await response.json()
-  
+  // axios 自动识别 FormData 并设置正确的 Content-Type（含 boundary）
+  const result = await post<{
+    success: boolean
+    data: { url: string; filename: string }
+    error?: { message?: string }
+  }>('/upload/video', formData)
   if (!result.success) {
     throw new Error(result.error?.message || '上传失败')
   }
-  
   return result.data
 }

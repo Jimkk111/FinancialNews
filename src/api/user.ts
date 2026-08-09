@@ -12,25 +12,15 @@ export async function updateProfile(data: Partial<UserInfo>): Promise<UserInfo> 
 export async function uploadAvatar(file: File): Promise<{ avatar: string }> {
   const formData = new FormData()
   formData.append('avatar', file)
-  
-  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/users/me/avatar`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem('access_token')}`,
-    },
-    body: formData,
-  })
-  
-  if (!response.ok) {
-    throw new Error('上传失败')
-  }
-  
-  const result = await response.json()
-  
+  // axios 自动识别 FormData 并设置正确的 Content-Type（含 boundary）
+  const result = await post<{
+    success: boolean
+    data: { avatar: string }
+    error?: { message?: string }
+  }>('/users/me/avatar', formData)
   if (!result.success) {
     throw new Error(result.error?.message || '上传失败')
   }
-  
   return result.data
 }
 
