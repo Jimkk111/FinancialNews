@@ -42,7 +42,7 @@ export function createStreamingChat(
 ): () => void {
   const controller = new AbortController()
 
-  const url = resolveUrl('/ai/chat')
+  const url = resolveUrl('/ai/chat/stream')
   const authHeaders = getAuthHeaders()
 
   fetch(url, {
@@ -54,7 +54,6 @@ export function createStreamingChat(
     body: JSON.stringify({
       messages,
       sessionId,
-      stream: true,
     }),
     signal: controller.signal,
   })

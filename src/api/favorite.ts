@@ -1,24 +1,16 @@
 import { get, getPaginated, post, del } from './request'
-import type { NewsItem, MessageResponse } from '@/types'
+import type { FavoriteItem, MessageResponse } from '@/types'
 import type { PaginatedResponse } from './request'
-
-export interface AddFavoriteRequest {
-  newsId: number
-  title: string
-  source?: string | null
-  publish_time?: string | null
-  views?: number
-}
 
 export async function getFavorites(params: {
   page?: number
   pageSize?: number
-}): Promise<PaginatedResponse<NewsItem>> {
-  return getPaginated<NewsItem>('/favorites', { params })
+}): Promise<PaginatedResponse<FavoriteItem>> {
+  return getPaginated<FavoriteItem>('/favorites', { params })
 }
 
-export async function addFavorite(data: AddFavoriteRequest): Promise<MessageResponse> {
-  return post<MessageResponse>('/favorites', data)
+export async function addFavorite(newsId: number): Promise<MessageResponse> {
+  return post<MessageResponse>('/favorites', { newsId })
 }
 
 export async function removeFavorite(newsId: number): Promise<MessageResponse> {

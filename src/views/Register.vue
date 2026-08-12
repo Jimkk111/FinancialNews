@@ -118,7 +118,7 @@ const handleSubmit = async (e: Event) => {
     const response = await register(registerRequest)
 
     if (response.success && response.data) {
-      authStore.login(response.data.access_token, response.data.user)
+      authStore.login(response.data.accessToken, response.data.user)
       router.push('/')
     } else {
       error.value = response.error?.message || '注册失败'

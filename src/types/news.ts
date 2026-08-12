@@ -8,10 +8,6 @@ export interface Tag {
   name: string
 }
 
-export interface IResponseNewsDetail {
-  data: NewsDetail
-}
-
 export interface NewsItem {
   id: number
   title: string
@@ -20,7 +16,10 @@ export interface NewsItem {
   source: string | null
   publishTime: string | null
   views: number
+  hasImage?: boolean
+  imageUrl?: string | null
   categoryId: number | null
+  userId?: number
   category: Category | null
   tags: Tag[]
   createdAt: string
@@ -28,13 +27,6 @@ export interface NewsItem {
 }
 
 export interface NewsDetail extends NewsItem {}
-
-export interface NewsDataBase {
-  title: string
-  source?: string | null
-  publish_time?: string | null
-  views?: number
-}
 
 export interface NewsListResponse {
   data: NewsItem[]
@@ -80,17 +72,25 @@ export interface PublishedNews extends NewsItem {}
 export interface FavoriteItem {
   newsId: number
   title: string
+  summary?: string
   source: string | null
   publishTime: string | null
   views: number
-  createdAt: string
+  hasImage?: boolean
+  imageUrl?: string | null
+  categoryId?: number | null
+  favoritedAt: string
 }
 
 export interface HistoryItem {
   newsId: number
   title: string
+  summary?: string
   source: string | null
   publishTime: string | null
   views: number
+  hasImage?: boolean
+  imageUrl?: string | null
+  categoryId?: number | null
   viewedAt: string
 }

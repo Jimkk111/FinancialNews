@@ -8,8 +8,8 @@ import type {
   MessageResponse,
   AvatarUploadResponse,
   CheckFavoriteResponse,
-  NewsItem,
-  NewsDataBase,
+  FavoriteItem,
+  HistoryItem,
 } from '@/types'
 import * as authApi from '@/api/auth'
 import * as userApi from '@/api/user'
@@ -121,24 +121,10 @@ export async function uploadAvatar(
 }
 
 export async function addFavorite(
-  newsId: number,
-  newsData?: NewsDataBase
+  newsId: number
 ): Promise<ApiResponse<MessageResponse>> {
-  if (!newsData) {
-    return {
-      success: false,
-      error: { code: 'MISSING_DATA', message: '缺少新闻数据' }
-    }
-  }
-
   try {
-    const data = await favoriteApi.addFavorite({
-      newsId,
-      title: newsData.title,
-      source: newsData.source,
-      publish_time: newsData.publish_time,
-      views: newsData.views
-    })
+    const data = await favoriteApi.addFavorite(newsId)
     return { success: true, data }
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '收藏失败'
@@ -167,7 +153,7 @@ export async function removeFavorite(
 export async function getFavorites(
   page: number = 1,
   pageSize: number = 20
-): Promise<ApiResponse<PaginatedResponse<NewsItem>>> {
+): Promise<ApiResponse<PaginatedResponse<FavoriteItem>>> {
   try {
     const data = await favoriteApi.getFavorites({ page, pageSize })
     return { success: true, data }
@@ -196,24 +182,10 @@ export async function checkFavorite(
 }
 
 export async function addHistory(
-  newsId: number,
-  newsData?: NewsDataBase
+  newsId: number
 ): Promise<ApiResponse<MessageResponse>> {
-  if (!newsData) {
-    return {
-      success: false,
-      error: { code: 'MISSING_DATA', message: '缺少新闻数据' }
-    }
-  }
-
   try {
-    const data = await historyApi.addHistory({
-      newsId,
-      title: newsData.title,
-      source: newsData.source,
-      publish_time: newsData.publish_time,
-      views: newsData.views
-    })
+    const data = await historyApi.addHistory(newsId)
     return { success: true, data }
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '添加历史记录失败'
@@ -227,7 +199,7 @@ export async function addHistory(
 export async function getHistory(
   page: number = 1,
   pageSize: number = 20
-): Promise<ApiResponse<PaginatedResponse<NewsItem>>> {
+): Promise<ApiResponse<PaginatedResponse<HistoryItem>>> {
   try {
     const data = await historyApi.getHistory({ page, pageSize })
     return { success: true, data }

@@ -1,6 +1,7 @@
 export interface UserInfo {
   id: number
   uid: string
+  displayId?: string
   username: string
   email: string
   avatar: string
@@ -19,7 +20,7 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-  access_token: string
+  accessToken: string
   user: UserInfo
 }
 

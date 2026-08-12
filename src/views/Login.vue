@@ -45,7 +45,7 @@ const handleSubmit = async (e: Event) => {
 
     if (response.success && response.data) {
 
-      authStore.login(response.data.access_token, response.data.user)
+      authStore.login(response.data.accessToken, response.data.user)
 
       router.push('/')
     } else {

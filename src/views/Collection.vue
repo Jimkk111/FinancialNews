@@ -5,7 +5,7 @@ import { ArrowLeft, Clock, Eye, Heart, Trash2 } from 'lucide-vue-next'
 import { getFavorites, removeFavorite } from '@/services/userService'
 import { useAuthStore } from '@/stores/auth'
 import { formatTime } from '@/utils/format'
-import type { NewsItem, PaginationInfo } from '@/types'
+import type { FavoriteItem, PaginationInfo } from '@/types'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -21,7 +21,7 @@ const handleNewsClick = (id: number) => {
 }
 
 const state = reactive<{
-  items: NewsItem[]
+  items: FavoriteItem[]
   loading: boolean
   error: string | null
   pagination: PaginationInfo
@@ -78,7 +78,7 @@ const handleRemoveFavorite = async (newsId: number, e: Event) => {
     const response = await removeFavorite(newsId)
 
     if (response.success) {
-      state.items = state.items.filter((item) => item.id !== newsId)
+      state.items = state.items.filter((item) => item.newsId !== newsId)
       state.pagination.total = Math.max(0, state.pagination.total - 1)
     } else {
       console.error('取消收藏失败:', response.error?.message)
@@ -121,9 +121,9 @@ onMounted(fetchFavorites)
       <div v-else-if="state.items.length > 0" class="divide-y divide-border">
         <div
           v-for="item in state.items"
-          :key="item.id"
+          :key="item.newsId"
           class="bg-card p-4 hover:bg-muted transition-colors"
-          @click="handleNewsClick(item.id)"
+          @click="handleNewsClick(item.newsId)"
         >
           <div class="flex flex-col gap-3">
             <h3 class="text-base font-medium text-foreground leading-relaxed">
@@ -143,7 +143,7 @@ onMounted(fetchFavorites)
                 </div>
               </div>
               <button
-                @click="handleRemoveFavorite(item.id, $event)"
+                @click="handleRemoveFavorite(item.newsId, $event)"
                 class="p-1 text-muted-foreground hover:text-red-500 transition-colors"
                 title="取消收藏"
               >

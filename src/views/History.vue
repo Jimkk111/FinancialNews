@@ -5,7 +5,7 @@ import { ArrowLeft, Clock, Eye, BookOpen } from 'lucide-vue-next'
 import { getHistory } from '@/services/userService'
 import { useAuthStore } from '@/stores/auth'
 import { formatTime } from '@/utils/format'
-import type { NewsItem, PaginationInfo } from '@/types'
+import type { HistoryItem, PaginationInfo } from '@/types'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -21,7 +21,7 @@ const handleNewsClick = (id: number) => {
 }
 
 const state = reactive<{
-  items: NewsItem[]
+  items: HistoryItem[]
   loading: boolean
   error: string | null
   pagination: PaginationInfo
@@ -102,9 +102,9 @@ onMounted(fetchHistory)
       <div v-else-if="state.items.length > 0" class="divide-y divide-border">
         <div
           v-for="item in state.items"
-          :key="item.id"
+          :key="item.newsId"
           class="bg-card p-4 hover:bg-muted transition-colors"
-          @click="handleNewsClick(item.id)"
+          @click="handleNewsClick(item.newsId)"
         >
           <div class="flex flex-col gap-3">
             <h3 class="text-base font-medium text-foreground leading-relaxed">
@@ -128,7 +128,7 @@ onMounted(fetchHistory)
             <div class="flex items-center gap-2 text-xs text-muted-foreground/70">
               <Clock :size="12" />
               <span>
-                阅读于 {{ formatTime(item.updatedAt) }}
+                阅读于 {{ formatTime(item.viewedAt) }}
               </span>
             </div>
           </div>

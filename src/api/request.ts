@@ -36,9 +36,14 @@ request.interceptors.response.use(
     }
 
     // 业务失败 —— 统一抛 ApiError
+    // VALIDATION_ERROR 时 data 为字段错误数组，传给 details 供表单展示
     if (body.code !== '200') {
       return Promise.reject(
-        new ApiError(body.code, body.msg || '请求失败'),
+        new ApiError(
+          body.code,
+          body.msg || '请求失败',
+          Array.isArray(body.data) ? body.data : undefined,
+        ),
       )
     }
 
