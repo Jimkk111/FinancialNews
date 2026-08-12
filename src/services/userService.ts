@@ -15,19 +15,22 @@ import * as authApi from '@/api/auth'
 import * as userApi from '@/api/user'
 import * as favoriteApi from '@/api/favorite'
 import * as historyApi from '@/api/history'
+import { ApiError } from '@/api/request'
 import type { PaginatedResponse } from '@/api/request'
 
 export async function login(
   credentials: LoginRequest
 ): Promise<ApiResponse<LoginResponse>> {
   try {
-    const response = await authApi.login(credentials)
-    return { success: true, data: response.data }
+    const data = await authApi.login(credentials)
+    return { success: true, data }
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : '登录失败'
     return {
       success: false,
-      error: { code: 'LOGIN_ERROR', message }
+      error: {
+        code: error instanceof ApiError ? error.code : 'LOGIN_ERROR',
+        message: error instanceof Error ? error.message : '登录失败',
+      },
     }
   }
 }
@@ -36,13 +39,15 @@ export async function register(
   userData: RegisterRequest
 ): Promise<ApiResponse<LoginResponse>> {
   try {
-    const response = await authApi.register(userData)
-    return { success: true, data: response.data }
+    const data = await authApi.register(userData)
+    return { success: true, data }
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : '注册失败'
     return {
       success: false,
-      error: { code: 'REGISTER_ERROR', message }
+      error: {
+        code: error instanceof ApiError ? error.code : 'REGISTER_ERROR',
+        message: error instanceof Error ? error.message : '注册失败',
+      },
     }
   }
 }

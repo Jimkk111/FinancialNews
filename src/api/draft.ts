@@ -51,29 +51,11 @@ export async function deletePublishedNews(id: number): Promise<MessageResponse> 
 export async function uploadImage(file: File): Promise<{ url: string; filename: string }> {
   const formData = new FormData()
   formData.append('image', file)
-  // axios 自动识别 FormData 并设置正确的 Content-Type（含 boundary）
-  const result = await post<{
-    success: boolean
-    data: { url: string; filename: string }
-    error?: { message?: string }
-  }>('/upload/image', formData)
-  if (!result.success) {
-    throw new Error(result.error?.message || '上传失败')
-  }
-  return result.data
+  return post<{ url: string; filename: string }>('/upload/image', formData)
 }
 
 export async function uploadVideo(file: File): Promise<{ url: string; filename: string }> {
   const formData = new FormData()
   formData.append('video', file)
-  // axios 自动识别 FormData 并设置正确的 Content-Type（含 boundary）
-  const result = await post<{
-    success: boolean
-    data: { url: string; filename: string }
-    error?: { message?: string }
-  }>('/upload/video', formData)
-  if (!result.success) {
-    throw new Error(result.error?.message || '上传失败')
-  }
-  return result.data
+  return post<{ url: string; filename: string }>('/upload/video', formData)
 }

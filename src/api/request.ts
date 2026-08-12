@@ -22,10 +22,45 @@ request.interceptors.request.use((config) => {
   return config
 })
 
-// ---------- 响应拦截器：解包 data + 401 统一处理 ----------
+// ---------- 响应拦截器：解包统一响应壳 + 401 处理 ----------
+// 后端统一格式：{ code: string, data: T, msg: string }
+// code === "200" 表示成功，其他为业务错误
 
 request.interceptors.response.use(
-  (response) => response.data,
+  (response) => {
+    const body = response.data
+
+    // 非标准包装格式，直接透传（兼容 SSE、blob 等非 JSON 场景）
+    if (!body || typeof body !== 'object' || !('code' in body)) {
+      return body
+    }
+
+    // 业务失败 —— 统一抛 ApiError
+    if (body.code !== '200') {
+      return Promise.reject(
+        new ApiError(body.code, body.msg || '请求失败'),
+      )
+    }
+
+    // 成功 —— 解包 data
+    const inner = body.data
+
+    // 分页响应：data 含 records 时，映射为 { data, pagination } 结构与现有代码对齐
+    if (inner && typeof inner === 'object' && 'records' in inner) {
+      return {
+        data: inner.records,
+        pagination: {
+          page: inner.page,
+          pageSize: inner.pageSize,
+          total: inner.total,
+          totalPages: Math.ceil(inner.total / inner.pageSize),
+        },
+      }
+    }
+
+    // 普通响应 —— 直接返回 data
+    return inner
+  },
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('access_token')
@@ -34,6 +69,26 @@ request.interceptors.response.use(
     return Promise.reject(error)
   },
 )
+
+// ============================================================
+// ApiError —— 业务错误
+// ============================================================
+
+export class ApiError extends Error {
+  code: string
+  details?: Array<{ field: string; message: string }>
+
+  constructor(
+    code: string,
+    message: string,
+    details?: Array<{ field: string; message: string }>,
+  ) {
+    super(message)
+    this.name = 'ApiError'
+    this.code = code
+    this.details = details
+  }
+}
 
 // ============================================================
 // 类型

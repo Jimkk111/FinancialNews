@@ -1,18 +1,12 @@
 import { post } from './request'
 import type { LoginRequest, LoginResponse, RegisterRequest, MessageResponse } from '@/types'
 
-interface BackendResponse<T> {
-  success: boolean
-  data: T
-  message?: string
+export async function login(data: LoginRequest): Promise<LoginResponse> {
+  return post<LoginResponse>('/auth/login', data)
 }
 
-export async function login(data: LoginRequest): Promise<BackendResponse<LoginResponse>> {
-  return post<BackendResponse<LoginResponse>>('/auth/login', data)
-}
-
-export async function register(data: RegisterRequest): Promise<BackendResponse<LoginResponse>> {
-  return post<BackendResponse<LoginResponse>>('/auth/register', data)
+export async function register(data: RegisterRequest): Promise<LoginResponse> {
+  return post<LoginResponse>('/auth/register', data)
 }
 
 export async function sendVerificationCode(email: string, username?: string): Promise<MessageResponse> {
