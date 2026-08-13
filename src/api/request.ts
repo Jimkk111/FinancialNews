@@ -10,16 +10,8 @@ const baseURL = import.meta.env.VITE_API_BASE_URL || '/api'
 const request: AxiosInstance = axios.create({
   baseURL,
   timeout: 10000,
-})
-
-// ---------- 请求拦截器：注入 Authorization token ----------
-
-request.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
-  return config
+  // JWT 改用 HttpOnly Cookie 传输：跨域请求需携带凭据（Cookie）
+  withCredentials: true,
 })
 
 // ---------- 响应拦截器：解包统一响应壳 + 401 处理 ----------
@@ -68,8 +60,10 @@ request.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('user_info')
+      // 401 表示 Cookie 失效/过期：清空内存登录态，由路由守卫拦截跳转登录页
+      import('@/stores/auth')
+        .then(({ useAuthStore }) => useAuthStore().clearAuth())
+        .catch(() => {})
     }
     return Promise.reject(error)
   },
@@ -138,19 +132,12 @@ export function getPaginated<T>(
 
 // ============================================================
 // Streaming / fetch 场景辅助工具
-// 对于 SSE 等 axios 无法原生支持的场景，提供统一的方式获取
-// baseURL 和 auth headers，避免各模块分散拼接
+// 对于 SSE 等 axios 无法原生支持的场景，提供统一的方式拼接 URL
 // ============================================================
 
 /** 根据相对路径拼接完整请求 URL */
 export function resolveUrl(path: string): string {
   return `${baseURL}${path}`
-}
-
-/** 获取当前存储的 Authorization 头，供 fetch 等场景复用 */
-export function getAuthHeaders(): Record<string, string> {
-  const token = localStorage.getItem('access_token')
-  return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
 export default request

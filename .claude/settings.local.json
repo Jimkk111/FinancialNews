@@ -6,7 +6,8 @@
       "Bash(cc-connect --version)",
       "Bash(claude --version)",
       "Bash(npx vue-tsc *)",
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(npm run *)"
     ]
   }
 }

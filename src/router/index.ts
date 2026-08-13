@@ -87,8 +87,10 @@ const router = createRouter({
 
 // 这是一个路由守卫。
 // 受保护路由被打开之前需要完成鉴权操作（authStore保存着当前用户的授权信息）。
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const authStore = useAuthStore()
+  // 等待登录态探测（GET /users/me）完成，避免刷新时误判为未登录
+  await authStore.init()
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     return '/login'
   }

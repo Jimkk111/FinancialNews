@@ -1,4 +1,4 @@
-import { get, post, put, del, resolveUrl, getAuthHeaders } from './request'
+import { get, post, put, del, resolveUrl } from './request'
 import type { ChatMessage, SessionInfo } from '@/types'
 
 export async function createSession(): Promise<{ session_id: string }> {
@@ -43,14 +43,14 @@ export function createStreamingChat(
   const controller = new AbortController()
 
   const url = resolveUrl('/ai/chat/stream')
-  const authHeaders = getAuthHeaders()
 
   fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...authHeaders,
     },
+    // JWT 由 HttpOnly Cookie 携带，跨域时需显式带上凭据
+    credentials: 'include',
     body: JSON.stringify({
       messages,
       sessionId,

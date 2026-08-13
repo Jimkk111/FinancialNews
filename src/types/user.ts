@@ -20,6 +20,7 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
+  // JWT 已改用 HttpOnly Cookie 传输，前端不再读取/存储该字段，仅保留以对齐后端契约
   accessToken: string
   user: UserInfo
 }
