@@ -201,6 +201,7 @@ const fetchNewsDetail = async () => {
   }
 }
 
+// 处理点击menu图标外部关闭menu
 const handleClickOutside = (event: MouseEvent) => {
   const target = event.target as HTMLElement
   if (!target.closest('.menu-container')) {
@@ -297,6 +298,8 @@ onUnmounted(() => {
         </div>
       </div>
 
+      <!-- 新闻正文 -->
+       <!-- TODO:后续需要美化正文样式与渲染方式,并同步优化新闻编辑模块 -->
       <article class="bg-card px-4 py-5 mt-2">
         <div
           class="tiptap text-foreground"
@@ -304,6 +307,7 @@ onUnmounted(() => {
         />
       </article>
 
+      <!-- 新闻标签 -->
       <div v-if="news.tags && news.tags.length > 0" class="bg-card px-4 py-4 mt-2">
         <div class="flex flex-wrap gap-2">
           <span
@@ -316,6 +320,7 @@ onUnmounted(() => {
         </div>
       </div>
 
+      <!-- 相关阅读 -->
       <div v-if="relatedNews.length > 0" class="bg-card px-4 py-4 mt-2">
         <h3 class="text-base font-semibold text-foreground mb-3">相关阅读</h3>
         <div class="space-y-3">

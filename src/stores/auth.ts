@@ -9,6 +9,8 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isAuthenticated = computed(() => !!user.value)
 
+  // jwt存在localStorage，过期后也不会清除，须改造。
+
   function init() {
     const token = localStorage.getItem('access_token')
     const storedUser = localStorage.getItem('user_info')

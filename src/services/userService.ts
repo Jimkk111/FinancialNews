@@ -225,4 +225,4 @@ export async function clearHistory(): Promise<ApiResponse<MessageResponse>> {
   }
 }
 
-export type { UserInfo, RegisterRequest, LoginRequest, LoginResponse, ResetPasswordRequest, MessageResponse, AvatarUploadResponse, CheckFavoriteResponse, NewsItem }
+export type { UserInfo, RegisterRequest, LoginRequest, LoginResponse, ResetPasswordRequest, MessageResponse, AvatarUploadResponse, CheckFavoriteResponse }

@@ -19,6 +19,8 @@ const handleSearch = (keyword: string) => {
   router.push({ name: 'searchResults', query: { q: keyword } })
 }
 
+
+// 点击用户头像的跳转需要鉴权
 const handleUserClick = () => {
   if (!authStore.isAuthenticated) {
     router.push('/login')
@@ -27,6 +29,7 @@ const handleUserClick = () => {
   }
 }
 
+// 切换到AI页面需要鉴权
 const handleTabChange = (tab: string) => {
   if (tab === 'ai' && !authStore.isAuthenticated) {
     router.push('/login')
@@ -48,6 +51,7 @@ const handleTabChange = (tab: string) => {
       <NewsList :category-id="selectedCategoryId" @news-click="handleNewsClick" />
     </main>
 
+    // active-tab高亮当前tab
     <BottomNav active-tab="home" @tab-change="handleTabChange" />
   </div>
 </template>
