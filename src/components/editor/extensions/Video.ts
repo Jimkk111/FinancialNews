@@ -7,7 +7,7 @@ export interface VideoOptions {
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     video: {
-      setVideo: (options: { src: string }) => ReturnType
+      setVideo: (options: { src: string; poster?: string }) => ReturnType
     }
   }
 }
@@ -19,6 +19,8 @@ export const Video = Node.create<VideoOptions>({
 
   atom: true,
 
+  draggable: true,
+
   addOptions() {
     return {
       HTMLAttributes: {},
@@ -27,39 +29,19 @@ export const Video = Node.create<VideoOptions>({
 
   addAttributes() {
     return {
-      src: {
-        default: null,
-      },
-      controls: {
-        default: true,
-      },
-      width: {
-        default: '100%',
-      },
+      src: { default: null },
+      poster: { default: null },
     }
   },
 
   parseHTML() {
-    return [
-      {
-        tag: 'video',
-      },
-    ]
+    return [{ tag: 'video' }]
   },
 
+  // 不内联任何 class，样式统一交由 .news-prose 作用域控制，
+  // 避免样式被 getHTML() 固化进存储数据。
   renderHTML({ HTMLAttributes }) {
-    return [
-      'div',
-      { class: 'video-container' },
-      [
-        'video',
-        mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
-          controls: 'controls',
-          class: 'rounded-lg max-w-full',
-          style: 'width: 100%;',
-        }),
-      ],
-    ]
+    return ['video', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, { controls: 'controls' })]
   },
 
   addCommands() {
@@ -67,10 +49,7 @@ export const Video = Node.create<VideoOptions>({
       setVideo:
         (options) =>
         ({ commands }) => {
-          return commands.insertContent({
-            type: this.name,
-            attrs: options,
-          })
+          return commands.insertContent({ type: this.name, attrs: options })
         },
     }
   },

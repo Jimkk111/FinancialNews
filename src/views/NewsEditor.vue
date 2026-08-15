@@ -11,8 +11,11 @@ import {
   updateDraftService,
   publishNewsService,
 } from '@/services/newsEditorService'
-import { getCategories } from '@/api/news'
-import type { NewsDraft, Category } from '@/types'
+import { getNewsCategories } from '@/services/newsService'
+import type { Category } from '@/types'
+import type { ArticleContent } from '@/types/content'
+import { htmlToBlocks } from '@/utils/content/htmlToBlocks'
+import { blocksToHtml } from '@/utils/content/blocksToHtml'
 
 const router = useRouter()
 const route = useRoute()
@@ -23,7 +26,7 @@ const title = ref('')
 const coverImage = ref<string | null>(null)
 const selectedTags = ref<number[]>([])
 const selectedCategory = ref<number | null>(null)
-const content = ref('')
+const content = ref<ArticleContent>([])
 const currentDraftId = ref<string | null>(null)
 const saving = ref(false)
 const publishing = ref(false)
@@ -33,9 +36,21 @@ const categories = ref<Category[]>([])
 
 let autoSaveTimer: ReturnType<typeof setInterval> | null = null
 
+// 自动保存脏检查：记录上次保存成功时的快照，仅当有改动时才保存
+let lastSavedSnapshot = ''
+
+const buildSnapshot = () =>
+  JSON.stringify({
+    title: title.value,
+    coverImage: coverImage.value,
+    categoryId: selectedCategory.value,
+    tags: selectedTags.value,
+    content: content.value,
+  })
+
 const loadCategories = async () => {
   try {
-    categories.value = await getCategories()
+    categories.value = await getNewsCategories()
   } catch {
     error.value = '加载分类失败'
   }
@@ -56,7 +71,9 @@ const loadDraft = async () => {
     title.value = draft.title
     coverImage.value = draft.coverImage
     selectedCategory.value = draft.categoryId
-    content.value = draft.content || ''
+    selectedTags.value = draft.tags ?? []
+    content.value = htmlToBlocks(draft.content || '')
+    lastSavedSnapshot = buildSnapshot()
   }
 }
 
@@ -64,47 +81,52 @@ watch(() => draftId, () => {
   loadDraft()
 }, { immediate: true })
 
-const saveDraft = async () => {
+const saveDraft = async (showSuccess = true) => {
+  if (saving.value) return
   saving.value = true
   error.value = ''
 
+  const payload = {
+    title: title.value || '未命名草稿',
+    content: blocksToHtml(content.value),
+    coverImage: coverImage.value,
+    categoryId: selectedCategory.value,
+    tags: selectedTags.value,
+  }
+
   try {
     if (currentDraftId.value) {
-      const response = await updateDraftService(currentDraftId.value, {
-        title: title.value,
-        coverImage: coverImage.value,
-        categoryId: selectedCategory.value,
-        content: content.value,
-      })
-      
+      const response = await updateDraftService(currentDraftId.value, payload)
       if (response.success && response.data) {
-        successMessage.value = '草稿已保存'
-        setTimeout(() => {
-          successMessage.value = ''
-        }, 2000)
+        if (showSuccess) {
+          successMessage.value = '草稿已保存'
+          setTimeout(() => {
+            successMessage.value = ''
+          }, 2000)
+        }
       } else {
         error.value = response.error?.message || '保存失败'
+        return
       }
     } else {
-      const response = await createDraftService({
-        title: title.value || '未命名草稿',
-        content: content.value,
-        coverImage: coverImage.value,
-        categoryId: selectedCategory.value,
-      })
-      
+      const response = await createDraftService(payload)
       if (response.success && response.data) {
         currentDraftId.value = response.data.id
-        successMessage.value = '草稿已保存'
-        setTimeout(() => {
-          successMessage.value = ''
-        }, 2000)
+        if (showSuccess) {
+          successMessage.value = '草稿已保存'
+          setTimeout(() => {
+            successMessage.value = ''
+          }, 2000)
+        }
       } else {
         error.value = response.error?.message || '保存失败'
+        return
       }
     }
+
+    lastSavedSnapshot = buildSnapshot()
   } catch (err) {
-    error.value = '保存失败'
+    error.value = err instanceof Error ? err.message : '保存失败'
   } finally {
     saving.value = false
   }
@@ -115,7 +137,7 @@ const publish = async () => {
     error.value = '请输入新闻标题'
     return
   }
-  if (!content.value.replace(/<[^>]*>/g, '').trim()) {
+  if (content.value.length === 0) {
     error.value = '请输入新闻内容'
     return
   }
@@ -123,17 +145,16 @@ const publish = async () => {
   publishing.value = true
   error.value = ''
 
-  const draft: NewsDraft = {
-    id: currentDraftId.value || '',
-    title: title.value,
-    coverImage: coverImage.value,
-    categoryId: selectedCategory.value,
-    content: content.value,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+  // 先保存，确保发布的是最新内容，并保证 currentDraftId 存在
+  await saveDraft(false)
+
+  if (!currentDraftId.value) {
+    error.value = '草稿保存失败，无法发布'
+    publishing.value = false
+    return
   }
 
-  const response = await publishNewsService(draft)
+  const response = await publishNewsService(currentDraftId.value)
 
   if (response.success && response.data) {
     router.push(`/news/${response.data.id}`)
@@ -147,7 +168,7 @@ const publish = async () => {
 onMounted(() => {
   loadCategories()
   autoSaveTimer = setInterval(() => {
-    if (title.value || content.value) {
+    if ((title.value || content.value.length) && buildSnapshot() !== lastSavedSnapshot) {
       saveDraft()
     }
   }, 30000)
@@ -173,7 +194,7 @@ onUnmounted(() => {
         <h1 class="text-lg font-semibold text-foreground">发布新闻</h1>
         <div class="flex items-center gap-2">
           <button
-            @click="saveDraft"
+            @click="saveDraft()"
             :disabled="saving"
             class="flex items-center gap-1 px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted rounded-lg transition-colors disabled:opacity-50"
           >

@@ -15,6 +15,7 @@ export async function createDraft(draft: {
   content?: string | null
   coverImage?: string | null
   categoryId?: number | null
+  tags?: number[]
 }): Promise<NewsDraft> {
   return post<NewsDraft>('/drafts', draft)
 }
@@ -24,6 +25,7 @@ export async function updateDraft(id: string, draft: {
   content?: string | null
   coverImage?: string | null
   categoryId?: number | null
+  tags?: number[]
 }): Promise<NewsDraft> {
   return put<NewsDraft>(`/drafts/${id}`, draft)
 }

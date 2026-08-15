@@ -2,8 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, Eye, Clock, Trash2, ChevronLeft, ChevronRight } from 'lucide-vue-next'
-import { getPublishedList } from '@/services/newsEditorService'
-import { deletePublishedNews } from '@/api/draft'
+import { getPublishedList, deletePublishedNewsService } from '@/services/newsEditorService'
 import { formatTime } from '@/utils/format'
 import type { PublishedNews, PaginationInfo } from '@/types'
 
@@ -47,11 +46,9 @@ const handleDelete = (id: number) => {
 
 const confirmDelete = async () => {
   if (deleteTargetId.value !== null) {
-    try {
-      await deletePublishedNews(deleteTargetId.value)
+    const response = await deletePublishedNewsService(deleteTargetId.value)
+    if (response.success) {
       loadPublished(pagination.value.page)
-    } catch {
-      // 删除失败
     }
   }
   showDeleteConfirm.value = false

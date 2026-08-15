@@ -6,7 +6,7 @@
 -->
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   ArrowLeft,
@@ -28,6 +28,8 @@ import {
   checkFavorite,
 } from '@/services/userService'
 import { formatTime } from '@/utils/format'
+import ArticleContent from '@/components/content/ArticleContent.vue'
+import { htmlToBlocks } from '@/utils/content/htmlToBlocks'
 import { useAuthStore } from '@/stores/auth'
 import type { NewsDetail as NewsType, NewsItem } from '@/types'
 
@@ -155,25 +157,8 @@ const loadRelatedNews = async (currentNews: NewsType) => {
   }
 }
 
-const formatContent = (content: string): string => {
-  if (!content) return ''
-  
-  if (/<p[\s>]/i.test(content) || /<br[\s\/]*>/i.test(content)) {
-    return content
-  }
-  
-  return content
-    .split(/\n\s*\n/)
-    .filter(para => para.trim())
-    .map(para => {
-      const cleanedPara = para
-        .replace(/[ \t]+/g, ' ')
-        .replace(/^[ \t]+/gm, '')
-        .replace(/\n/g, '<br>')
-      return `<p>${cleanedPara}</p>`
-    })
-    .join('')
-}
+// 后端 content 目前仍为 HTML 字符串，转成块级 JSON 后再渲染
+const contentBlocks = computed(() => (news.value ? htmlToBlocks(news.value.content) : []))
 
 const fetchNewsDetail = async () => {
   try {
@@ -298,13 +283,9 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- 新闻正文 -->
-       <!-- TODO:后续需要美化正文样式与渲染方式,并同步优化新闻编辑模块 -->
+      <!-- 新闻正文（块级 JSON 渲染，无 v-html） -->
       <article class="bg-card px-4 py-5 mt-2">
-        <div
-          class="tiptap text-foreground"
-          v-html="formatContent(news.content)"
-        />
+        <ArticleContent :content="contentBlocks" />
       </article>
 
       <!-- 新闻标签 -->

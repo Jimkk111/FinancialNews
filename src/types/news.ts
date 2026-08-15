@@ -63,6 +63,7 @@ export interface NewsDraft {
   content: string | null
   coverImage: string | null
   categoryId: number | null
+  tags?: number[]
   createdAt: string
   updatedAt: string
 }
