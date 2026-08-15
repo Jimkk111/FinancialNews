@@ -25,8 +25,12 @@ const getAvatarUrl = (avatarPath: string | null) => {
 </script>
 
 <template>
-  <header class="fixed top-0 left-0 right-0 z-50 bg-background border-b border-border">
-    <div class="flex items-center justify-between h-14 px-4 max-w-md mx-auto">
+  <header class="fixed top-0 left-0 right-0 z-50 h-14 bg-background border-b border-border flex items-center justify-between px-4">
+    <!-- logo -->
+    <div class="logo flex items-center">
+      <img class="h-9 w-auto" src="@/assets/imgs/logo.png" alt="">
+    </div>
+    <div class="flex items-center">
       <div class="flex items-center gap-3">
 
         <!-- 主题切换按钮 -->
@@ -40,9 +44,9 @@ const getAvatarUrl = (avatarPath: string | null) => {
         </button>
       </div>
 
-      <div class="flex items-center">
+      <!-- <div class="flex items-center">
         <span class="text-lg font-bold text-brand">财经新闻</span>
-      </div>
+      </div> -->
 
       <button
         type="button"
