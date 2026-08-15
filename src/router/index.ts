@@ -82,6 +82,12 @@ const router = createRouter({
       component: () => import('../views/MyPublished.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/crawler',
+      name: 'crawler',
+      component: () => import('../views/Crawler.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 

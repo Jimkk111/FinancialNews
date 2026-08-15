@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { ChevronRight, Heart, User, BookOpen, PenSquare, FileText, Send } from 'lucide-vue-next'
+import { ChevronRight, Heart, User, BookOpen, PenSquare, FileText, Send, Globe } from 'lucide-vue-next'
 import BottomNav from '@/components/BottomNav.vue'
 import Avatar from '@/components/Avatar.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -18,6 +18,7 @@ const menuItems = [
   { icon: Send, label: '我的发布', route: '/my-published' },
   { icon: Heart, label: '我的收藏', route: '/collection' },
   { icon: BookOpen, label: '阅读历史', route: '/history' },
+  { icon: Globe, label: '爬虫管理', route: '/crawler' },
 ]
 
 const getAvatarUrl = (avatarPath: string | null) => {
