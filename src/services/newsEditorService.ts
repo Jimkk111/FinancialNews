@@ -110,6 +110,7 @@ export async function createDraftService(draft: {
   content?: string | null
   coverImage?: string | null
   categoryId?: number | null
+  tags?: number[]
 }): Promise<ApiResponse<NewsDraft>> {
   try {
     const data = await draftApi.createDraft(draft)
@@ -128,6 +129,7 @@ export async function updateDraftService(id: string, draft: {
   content?: string | null
   coverImage?: string | null
   categoryId?: number | null
+  tags?: number[]
 }): Promise<ApiResponse<NewsDraft>> {
   try {
     const data = await draftApi.updateDraft(id, draft)
@@ -154,28 +156,35 @@ export async function deleteDraftService(id: string): Promise<ApiResponse<null>>
   }
 }
 
-export async function publishNewsService(draft: NewsDraft): Promise<ApiResponse<PublishedNews>> {
+export async function publishNewsService(id: string): Promise<ApiResponse<PublishedNews>> {
   try {
-    if (!draft.title.trim()) {
+    if (!id) {
       return {
         success: false,
-        error: { code: 'VALIDATION_ERROR', message: '请输入新闻标题' },
-      }
-    }
-    if (!draft.content?.trim()) {
-      return {
-        success: false,
-        error: { code: 'VALIDATION_ERROR', message: '请输入新闻内容' },
+        error: { code: 'VALIDATION_ERROR', message: '草稿尚未保存，无法发布' },
       }
     }
 
-    const data = await draftApi.publishDraft(draft.id)
+    const data = await draftApi.publishDraft(id)
     return { success: true, data }
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '发布失败'
     return {
       success: false,
       error: { code: 'PUBLISH_ERROR', message },
+    }
+  }
+}
+
+export async function deletePublishedNewsService(id: number): Promise<ApiResponse<null>> {
+  try {
+    await draftApi.deletePublishedNews(id)
+    return { success: true, data: null }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : '删除失败'
+    return {
+      success: false,
+      error: { code: 'DELETE_PUBLISHED_ERROR', message },
     }
   }
 }

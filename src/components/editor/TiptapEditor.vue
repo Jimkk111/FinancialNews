@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
-import { Node } from '@tiptap/core'
+import { Video as VideoExtension } from './extensions/Video'
+import type { ArticleContent } from '@/types/content'
+import { tiptapToBlocks } from '@/utils/content/tiptapToBlocks'
+import { blocksToTiptap } from '@/utils/content/blocksToTiptap'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
 import Link from '@tiptap/extension-link'
@@ -26,30 +29,12 @@ import {
 } from 'lucide-vue-next'
 import { uploadImage, uploadVideo } from '@/services/newsEditorService'
 
-const VideoExtension = Node.create({
-  name: 'video',
-  group: 'block',
-  atom: true,
-  draggable: true,
-  addAttributes() {
-    return {
-      src: { default: null },
-    }
-  },
-  parseHTML() {
-    return [{ tag: 'video' }]
-  },
-  renderHTML({ HTMLAttributes }) {
-    return ['video', { ...HTMLAttributes, controls: true, class: 'rounded-lg w-full' }]
-  },
-})
-
 const props = defineProps<{
-  modelValue: string
+  modelValue: ArticleContent
 }>()
 
 const emit = defineEmits<{
-  'update:modelValue': [value: string]
+  'update:modelValue': [value: ArticleContent]
 }>()
 
 const isComposing = ref(false)
@@ -61,17 +46,18 @@ const isUploadingImage = ref(false)
 const videoFileInputRef = ref<HTMLInputElement | null>(null)
 const isUploadingVideo = ref(false)
 
+
+// 编辑器内部是 ProseMirror 文档树，props.modelValue 是块级 JSON（ArticleContent）：
+// 初始化时经 blocksToTiptap 转成文档树；文档树变化时 onUpdate 经 tiptapToBlocks 通知父组件；
+// 父组件更新 modelValue 时，watch 再经 blocksToTiptap 解析回文档树。
 const editor = useEditor({
-  content: props.modelValue,
+  content: blocksToTiptap(props.modelValue),
   extensions: [
     StarterKit,
-    Image.configure({
-      HTMLAttributes: { class: 'rounded-lg max-w-full' },
-    }),
-    // configure自定义配置，下面用到的配置项是常见的。
+    Image,
+    // 链接在编辑态不可点击跳转；样式交由 .news-prose 作用域控制
     Link.configure({
       openOnClick: false,
-      HTMLAttributes: { class: 'text-blue-600 underline' },
     }),
     Placeholder.configure({
       placeholder: '请输入新闻正文...',
@@ -81,7 +67,7 @@ const editor = useEditor({
   editorProps: {
     // 编辑器的属性
     attributes: {
-      class: 'focus:outline-none min-h-[300px] px-4 py-3',
+      class: 'news-prose focus:outline-none min-h-[300px] px-4 py-3',
     },
     // 中文输入过程只触发一次onUpdate
     handleDOMEvents: {
@@ -99,20 +85,20 @@ const editor = useEditor({
   onUpdate: () => {
     if (isComposing.value) return
     updatingFromEditor = true
-    emit('update:modelValue', editor.value?.getHTML() ?? '')
+    emit('update:modelValue', tiptapToBlocks(editor.value?.getJSON()))
     nextTick(() => {
       updatingFromEditor = false
     })
   },
 })
 
- // 这个watch的作用是监听props.modelValue的改变，从而更新编辑器的内容
+ // 这个watch的作用是监听props.modelValue的改变，块级JSON被解析回内部文档树
 watch(
   () => props.modelValue,
   (val) => {
     if (updatingFromEditor) return
-    if (editor.value && editor.value.getHTML() !== val) {
-      editor.value.commands.setContent(val, { emitUpdate: false })
+    if (editor.value) {
+      editor.value.commands.setContent(blocksToTiptap(val), { emitUpdate: false })
     }
   },
 )
@@ -154,7 +140,7 @@ const addLink = () => {
   editor.value?.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
 }
 
-const addYoutube = () => {
+const addVideo = () => {
   videoFileInputRef.value?.click()
 }
 
@@ -296,7 +282,7 @@ const handleVideoUpload = async (event: Event) => {
       </button>
       <button
         type="button"
-        @click="addYoutube"
+        @click="addVideo"
         :disabled="isUploadingVideo"
         class="p-1.5 rounded hover:bg-gray-200 transition-colors text-gray-600 disabled:opacity-50"
         title="插入视频"
@@ -346,3 +332,12 @@ const handleVideoUpload = async (event: Event) => {
     />
   </div>
 </template>
+
+<style>
+/* 编辑器结点的样式来源：
+  1. tiptap默认样式
+  2. tailwindcss样式覆盖
+  3. 内联样式
+  4. class
+*/
+</style>

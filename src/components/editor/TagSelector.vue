@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { X } from 'lucide-vue-next'
-import { getTags } from '@/api/news'
+import { getNewsTags } from '@/services/newsService'
 import type { Tag } from '@/types'
 
 interface Props {
@@ -18,7 +18,7 @@ const tags = ref<Tag[]>([])
 
 const loadTags = async () => {
   try {
-    tags.value = await getTags()
+    tags.value = await getNewsTags()
   } catch {
     // 加载失败时保持空数组
   }
