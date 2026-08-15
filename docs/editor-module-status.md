@@ -38,7 +38,7 @@ type ArticleContent = Block[]
 
 **约束（重要）**：schema 中不允许出现 `style` / `class` 等样式字段。样式只允许存在于「渲染组件」与「prose 主题样式」两层。
 
-## 三、新文件结构
+## 三、文件结构
 
 ```
 src/types/content.ts                        # 内容模型类型
@@ -47,8 +47,6 @@ src/utils/content/
   validateContent.ts                        # 运行时结构校验 normalizeContent
   tiptapToBlocks.ts                         # TipTap JSON → 块 JSON（编辑器输出）
   blocksToTiptap.ts                         # 块 JSON → TipTap JSON（编辑器回填）
-  htmlToBlocks.ts                           # HTML → 块 JSON（旧数据/后端兼容）
-  blocksToHtml.ts                           # 块 JSON → 干净 HTML（保存适配旧后端）
 src/components/content/
   ArticleContent.vue                        # 渲染入口，按 block.type 分发
   InlineText.vue                            # 内联渲染（render function）
@@ -64,19 +62,18 @@ src/styles/prose.css                        # .news-prose 主题排版（替换 
 
 ```
 编辑：TipTap 文档树 --getJSON--> tiptapToBlocks --> ArticleContent（v-model）
-保存：ArticleContent --blocksToHtml--> HTML 字符串 --> 后端（旧契约，暂未改）
-加载：后端 HTML 字符串 --htmlToBlocks--> ArticleContent --> blocksToTiptap --> TipTap 文档树
-展示：后端 HTML 字符串 --htmlToBlocks--> ArticleContent --> ArticleContent 组件（无 v-html）
+保存：ArticleContent --contentJson--> 后端
+加载：后端 contentJson --blocksToTiptap--> TipTap 文档树
+展示：后端 contentJson --> ArticleContent 组件（无 v-html）
 ```
 
-关键点：编辑器 `v-model` 已切换为 `ArticleContent`；但**后端存储目前仍为 HTML 字符串**（`blocksToHtml`/`htmlToBlocks` 作为适配器），待后端切换到 JSON 存储后可移除这两个适配器（见 `docs/backend-integration-requirements.md`）。
+关键点：编辑器 `v-model` 与后端 `contentJson` 字段均为块级 JSON（`ArticleContent`），前端不再做任何 HTML 转换；仅保留 TipTap 与块 JSON 之间的转换器（`tiptapToBlocks` / `blocksToTiptap`）。
 
 ## 五、安全模型
 
 - 渲染无 `v-html`，文本插值自动转义。
 - `normalizeContent`（`validateContent.ts`）在渲染入口对任意输入做结构校验：未知 block 丢弃、非法 URL 的 image/video 丢弃、link 标记丢弃但保留文本。
 - `sanitizeUrl` 拦截 `javascript:` / `vbscript:` / `data:` / `file:` 协议。
-- `htmlToBlocks` 的 DOMParser 转换本身即白名单：`script`/`style`/`iframe`/`on*` 等一律不提取。
 
 ## 六、样式机制
 
@@ -101,5 +98,5 @@ src/styles/prose.css                        # .news-prose 主题排版（替换 
 ## 八、已知限制（待后续）
 
 1. **嵌套列表**：v1 扁平化处理，TipTap 里 tab 缩进的嵌套列表不展开层级（文本保留）。
-2. **后端存储仍为 HTML**：块 JSON 是前端契约，后端 `content` 字段仍是 HTML 字符串，由 `blocksToHtml`/`htmlToBlocks` 桥接。
-3. **爬取内容**：尚未接入 AI 结构化，旧爬取 HTML 由 `htmlToBlocks` 宽松降级渲染（丢弃结构、保留文本）。
+2. **爬取内容**：尚未接入 AI 结构化，依赖后端把爬取内容也规范化为 `contentJson` 后前端直接渲染。
+3. **旧数据**：历史新闻若无 `contentJson` 字段，前端展示为空，需后端迁移补齐。

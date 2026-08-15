@@ -29,7 +29,6 @@ import {
 } from '@/services/userService'
 import { formatTime } from '@/utils/format'
 import ArticleContent from '@/components/content/ArticleContent.vue'
-import { htmlToBlocks } from '@/utils/content/htmlToBlocks'
 import { useAuthStore } from '@/stores/auth'
 import type { NewsDetail as NewsType, NewsItem } from '@/types'
 
@@ -157,8 +156,8 @@ const loadRelatedNews = async (currentNews: NewsType) => {
   }
 }
 
-// 后端 content 目前仍为 HTML 字符串，转成块级 JSON 后再渲染
-const contentBlocks = computed(() => (news.value ? htmlToBlocks(news.value.content) : []))
+// 后端 contentJson 为块级 JSON，直接渲染（旧数据无 contentJson 时为空）
+const contentBlocks = computed(() => news.value?.contentJson ?? [])
 
 const fetchNewsDetail = async () => {
   try {

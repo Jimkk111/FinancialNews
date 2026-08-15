@@ -1,6 +1,7 @@
 import { get, post, put, del, getPaginated } from './request'
 import type { PaginatedResponse } from './request'
 import type { NewsDraft, PublishedNews, MessageResponse } from '@/types'
+import type { ArticleContent } from '@/types/content'
 
 export async function getDrafts(): Promise<NewsDraft[]> {
   return get<NewsDraft[]>('/drafts')
@@ -12,7 +13,7 @@ export async function getDraft(id: string): Promise<NewsDraft> {
 
 export async function createDraft(draft: {
   title: string
-  content?: string | null
+  contentJson?: ArticleContent | null
   coverImage?: string | null
   categoryId?: number | null
   tags?: number[]
@@ -22,7 +23,7 @@ export async function createDraft(draft: {
 
 export async function updateDraft(id: string, draft: {
   title?: string
-  content?: string | null
+  contentJson?: ArticleContent | null
   coverImage?: string | null
   categoryId?: number | null
   tags?: number[]
