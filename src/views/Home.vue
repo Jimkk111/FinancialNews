@@ -51,7 +51,6 @@ const handleTabChange = (tab: string) => {
       <NewsList :category-id="selectedCategoryId" @news-click="handleNewsClick" />
     </main>
 
-    // active-tab高亮当前tab
     <BottomNav active-tab="home" @tab-change="handleTabChange" />
   </div>
 </template>
