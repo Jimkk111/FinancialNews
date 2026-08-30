@@ -105,7 +105,9 @@ export const useAiSessionStore = defineStore('aiSession', () => {
     try {
       const data = await getSessions() as any
       const rawSessions = Array.isArray(data) ? data : (data?.sessions || data?.data || [])
-      sessions.value = rawSessions.map(normalizeSession)
+      sessions.value = rawSessions
+        .map(normalizeSession)
+        .sort((a: SessionInfo, b: SessionInfo) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
 
       localStorage.setItem('aiAssistantConversations', JSON.stringify(
         sessions.value.map(s => ({
@@ -262,11 +264,11 @@ export const useAiSessionStore = defineStore('aiSession', () => {
             }]
             hasCreatedMessage = true
           } else {
-            messages.value = messages.value.map(msg =>
-              msg.id === aiMessageId
-                ? { ...msg, content: currentContent }
-                : msg
-            )
+            // 原地修改已有对象属性，确保 Vue Proxy 能精确追踪变更并触发响应式更新
+            const aiMsg = messages.value.find(msg => msg.id === aiMessageId)
+            if (aiMsg) {
+              aiMsg.content = currentContent
+            }
           }
         }
       )
@@ -277,11 +279,12 @@ export const useAiSessionStore = defineStore('aiSession', () => {
       }
 
       if (hasCreatedMessage) {
-        messages.value = messages.value.map(msg =>
-          msg.id === aiMessageId
-            ? { ...msg, content: response.content || 'AI暂无回应', status: 'complete' }
-            : msg
-        )
+        // 原地修改，避免替换整个数组导致依赖追踪失效
+        const aiMsg = messages.value.find(msg => msg.id === aiMessageId)
+        if (aiMsg) {
+          aiMsg.content = response.content || 'AI暂无回应'
+          aiMsg.status = 'complete'
+        }
       } else {
         messages.value = [...messages.value, {
           id: aiMessageId,
@@ -308,6 +311,11 @@ export const useAiSessionStore = defineStore('aiSession', () => {
 
   function clearError() {
     error.value = null
+  }
+
+  function resetSending() {
+    isSending.value = false
+    isLoading.value = false
   }
 
   function toggleSidebar() {
@@ -380,6 +388,7 @@ export const useAiSessionStore = defineStore('aiSession', () => {
     sendMessage,
     clearMessages,
     clearError,
+    resetSending,
     toggleSidebar,
     closeSidebar,
     setSearchQuery,

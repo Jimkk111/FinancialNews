@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import { Sparkles, Copy, RefreshCw, Check } from 'lucide-vue-next'
+import { Sparkles, Copy, RefreshCw } from 'lucide-vue-next'
 import { marked } from 'marked'
 import type { Message } from '@/stores/aiSession'
 
@@ -13,7 +13,6 @@ const emit = defineEmits<{
 }>()
 
 const displayContent = ref('')
-const typingSpeed = 30 // 打字速度（毫秒/字符）
 
 const renderedContent = computed(() => {
   return marked(displayContent.value) as string
@@ -29,45 +28,27 @@ const formattedTime = computed(() => {
 const isUser = computed(() => props.message.role === 'user')
 const isStreaming = computed(() => props.message.status === 'streaming')
 
-// 打字机效果
-function startTyping() {
-  if (!isStreaming.value) {
-    displayContent.value = props.message.content
-    return
-  }
-
-  displayContent.value = ''
-  let index = 0
-  const content = props.message.content
-  
-  const typingInterval = setInterval(() => {
-    if (index < content.length) {
-      displayContent.value = content.substring(0, index + 1)
-      index++
-    } else {
-      clearInterval(typingInterval)
-    }
-  }, typingSpeed)
+// 更新显示内容（流式时直接展示，流式本身就是渐进效果）
+function updateDisplay() {
+  displayContent.value = props.message.content
 }
 
-// 监听消息内容变化，重新开始打字
 watch(
   () => props.message.content,
   () => {
-    startTyping()
-  },
-  { deep: true }
+    updateDisplay()
+  }
 )
 
 watch(
   () => props.message.status,
   () => {
-    startTyping()
+    updateDisplay()
   }
 )
 
 onMounted(() => {
-  startTyping()
+  updateDisplay()
 })
 
 async function copyContent() {

@@ -41,6 +41,7 @@ export function createStreamingChat(
   sessionId?: string
 ): () => void {
   const controller = new AbortController()
+  const IDLE_TIMEOUT = 30000 // 30秒无数据则超时
 
   const url = resolveUrl('/ai/chat/stream')
 
@@ -49,7 +50,6 @@ export function createStreamingChat(
     headers: {
       'Content-Type': 'application/json',
     },
-    // JWT 由 HttpOnly Cookie 携带，跨域时需显式带上凭据
     credentials: 'include',
     body: JSON.stringify({
       messages,
@@ -58,92 +58,100 @@ export function createStreamingChat(
     signal: controller.signal,
   })
     .then(async (response) => {
-      console.log('Streaming response status:', response.status)
-      console.log('Content-Type:', response.headers.get('content-type'))
-      console.log('Headers:', Object.fromEntries(response.headers.entries()))
-      
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        console.error('Error response:', errorData)
         throw new Error(errorData.error?.message || '请求失败')
       }
-      
+
       const contentType = response.headers.get('content-type')
       if (!contentType?.includes('text/event-stream')) {
-        console.error('Expected text/event-stream, got:', contentType)
         throw new Error('响应不是流式数据')
       }
-      
+
       const reader = response.body?.getReader()
       if (!reader) {
         throw new Error('无法读取响应')
       }
-      
+
       const decoder = new TextDecoder()
       let receivedSessionId: string | undefined
       let buffer = ''
-      
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        
-        const chunk = decoder.decode(value, { stream: true })
-        buffer += chunk
-        
-        console.log('Raw chunk received:', JSON.stringify(chunk))
-        
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
-        
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6)
-            if (data === '[DONE]') {
-              console.log('Stream completed')
-              onComplete(receivedSessionId)
-              return
-            }
-            try {
-              const parsed = JSON.parse(data)
-              console.log('Parsed data:', parsed)
-              if (parsed.content) {
-                onChunk(parsed.content)
+
+      try {
+        while (true) {
+          // 空闲超时：若 IDLE_TIMEOUT 内无新数据到达，则中止请求
+          const result = await Promise.race([
+            reader.read(),
+            new Promise<never>((_, reject) => {
+              setTimeout(() => reject(new Error('流式响应超时')), IDLE_TIMEOUT)
+            })
+          ])
+
+          if (result.done) break
+
+          const chunk = decoder.decode(result.value, { stream: true })
+          buffer += chunk
+
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+
+          for (const line of lines) {
+            const trimmed = line.trim()
+            if (!trimmed) continue
+
+            if (trimmed.startsWith('data:')) {
+              const data = trimmed.slice(5).trim()
+              if (data === '[DONE]') {
+                onComplete(receivedSessionId)
+                return
               }
-              if (parsed.sessionId) {
-                receivedSessionId = parsed.sessionId
+              try {
+                const parsed = JSON.parse(data)
+                if (parsed.content) {
+                  onChunk(parsed.content)
+                }
+                if (parsed.sessionId) {
+                  receivedSessionId = parsed.sessionId
+                }
+              } catch {
+                // 非 JSON 数据行，跳过
               }
-            } catch (e) {
-              console.log('Parse error:', e)
-              console.log('Raw data causing error:', JSON.stringify(data))
-            }
-          }
-        }
-      }
-      
-      if (buffer) {
-        console.log('Processing remaining buffer:', JSON.stringify(buffer))
-        if (buffer.startsWith('data: ')) {
-          const data = buffer.slice(6)
-          if (data !== '[DONE]') {
-            try {
-              const parsed = JSON.parse(data)
-              console.log('Parsed final data:', parsed)
-              if (parsed.content) {
-                onChunk(parsed.content)
-              }
-            } catch (e) {
-              console.log('Final parse error:', e)
             }
           }
         }
+
+        // 流已结束，处理剩余 buffer
+        if (buffer.trim()) {
+          const lines = buffer.split('\n')
+          for (const line of lines) {
+            const trimmed = line.trim()
+            if (trimmed.startsWith('data:')) {
+              const data = trimmed.slice(5).trim()
+              if (data !== '[DONE]') {
+                try {
+                  const parsed = JSON.parse(data)
+                  if (parsed.content) {
+                    onChunk(parsed.content)
+                  }
+                  if (parsed.sessionId) {
+                    receivedSessionId = parsed.sessionId
+                  }
+                } catch {
+                  // skip
+                }
+              }
+            }
+          }
+        }
+
+        onComplete(receivedSessionId)
+      } finally {
+        controller.abort()
       }
-      
-      onComplete(receivedSessionId)
     })
     .catch((error) => {
-      console.error('Streaming error:', error)
       onError(error)
     })
-  
+
   return () => controller.abort()
 }
