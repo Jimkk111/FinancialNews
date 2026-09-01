@@ -36,31 +36,64 @@ onMounted(fetchCategories)
 </script>
 
 <template>
-  <div class="sticky top-14 z-40 bg-background border-b border-border">
-    <div class="flex overflow-x-auto px-4 py-3 gap-6 scrollbar-hide">
+  <div class="nb-tabs">
+    <div class="nb-tabs__scroller">
       <button
-        :class="[
-          'whitespace-nowrap text-[15px] transition-colors relative pb-1',
-          activeCategory === null ? 'text-brand font-bold' : 'text-muted-foreground'
-        ]"
+        class="nb-tabs__item"
+        :class="{ 'is-active': activeCategory === null }"
         @click="handleCategoryClick(null)"
       >
         全部
-        <div v-if="activeCategory === null" class="absolute bottom-0 left-0 right-0 h-0.5 bg-brand" />
       </button>
 
       <button
         v-for="category in categories"
         :key="category.id"
-        :class="[
-          'whitespace-nowrap text-[15px] transition-colors relative pb-1',
-          activeCategory === category.id ? 'text-brand font-bold' : 'text-muted-foreground'
-        ]"
+        class="nb-tabs__item"
+        :class="{ 'is-active': activeCategory === category.id }"
         @click="handleCategoryClick(category.id)"
       >
         {{ category.name }}
-        <div v-if="activeCategory === category.id" class="absolute bottom-0 left-0 right-0 h-0.5 bg-brand" />
       </button>
     </div>
   </div>
 </template>
+
+<style scoped lang="scss">
+@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
+.nb-tabs {
+  border-bottom: 1px solid var(--nb-border);
+
+  &__scroller {
+    display: flex;
+    gap: $sp-1;
+    padding: $sp-2 $sp-4;
+    overflow-x: auto;
+    @include hide-scrollbar;
+  }
+
+  &__item {
+    flex-shrink: 0;
+    padding: $sp-1 $sp-3;
+    font-size: $fs-base;
+    line-height: 1.4;
+    color: var(--nb-text-secondary);
+    white-space: nowrap;
+    border-radius: $radius-md;
+    transition: background-color $dur-fast $ease, color $dur-fast $ease;
+
+    &:hover {
+      background-color: var(--nb-hover);
+      color: var(--nb-text);
+    }
+
+    &.is-active {
+      color: var(--nb-brand);
+      font-weight: $fw-medium;
+      background-color: var(--nb-brand-subtle);
+    }
+  }
+}
+</style>

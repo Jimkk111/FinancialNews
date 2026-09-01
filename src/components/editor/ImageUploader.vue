@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { NIcon, NSpin } from 'naive-ui'
 import { ImagePlus, X } from 'lucide-vue-next'
 import { uploadImage } from '@/services/newsEditorService'
 
@@ -16,21 +17,18 @@ const emit = defineEmits<{
 const isUploading = ref(false)
 const error = ref('')
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const isDragging = ref(false)
 
 const handleClick = () => {
   fileInputRef.value?.click()
 }
 
-const handleFileChange = async (event: Event) => {
-  const target = event.target as HTMLInputElement
-  const file = target.files?.[0]
-  if (!file) return
-
+const uploadFile = async (file: File) => {
   error.value = ''
   isUploading.value = true
 
   const response = await uploadImage(file)
-  
+
   if (response.success && response.data) {
     emit('update:modelValue', response.data.url)
   } else {
@@ -38,6 +36,15 @@ const handleFileChange = async (event: Event) => {
   }
 
   isUploading.value = false
+}
+
+const handleFileChange = async (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+
+  await uploadFile(file)
+
   if (fileInputRef.value) {
     fileInputRef.value.value = ''
   }
@@ -49,73 +56,171 @@ const handleRemove = () => {
 
 const handleDrop = async (event: DragEvent) => {
   event.preventDefault()
+  isDragging.value = false
   const file = event.dataTransfer?.files[0]
   if (!file) return
-
-  error.value = ''
-  isUploading.value = true
-
-  const response = await uploadImage(file)
-  
-  if (response.success && response.data) {
-    emit('update:modelValue', response.data.url)
-  } else {
-    error.value = response.error?.message || '上传失败'
-  }
-
-  isUploading.value = false
+  await uploadFile(file)
 }
 
 const handleDragOver = (event: DragEvent) => {
   event.preventDefault()
+  isDragging.value = true
+}
+
+const handleDragLeave = () => {
+  isDragging.value = false
 }
 </script>
 
 <template>
-  <div class="relative">
+  <div class="uploader">
     <div
       v-if="!modelValue"
-      class="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center cursor-pointer hover:border-gray-300 transition-colors"
-      :class="{ 'border-brand bg-red-50': isUploading }"
+      class="uploader__dropzone"
+      :class="{ 'is-active': isDragging }"
       @click="handleClick"
       @drop="handleDrop"
       @dragover="handleDragOver"
+      @dragleave="handleDragLeave"
     >
-      <div v-if="isUploading" class="flex flex-col items-center">
-        <div class="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin mb-2" />
-        <span class="text-sm text-gray-500">上传中...</span>
+      <div v-if="isUploading" class="uploader__state">
+        <n-spin size="medium" />
+        <span class="uploader__state-text">上传中...</span>
       </div>
-      <div v-else class="flex flex-col items-center">
-        <ImagePlus :size="32" class="text-gray-400 mb-2" />
-        <span class="text-sm text-gray-500">点击或拖拽上传封面图</span>
-        <span class="text-xs text-gray-400 mt-1">支持 PNG、JPEG、GIF、WebP，最大 5MB</span>
+      <div v-else class="uploader__state">
+        <n-icon class="uploader__icon" :component="ImagePlus" :size="30" />
+        <span class="uploader__text">点击或拖拽上传封面图</span>
+        <span class="uploader__hint">支持 PNG、JPEG、GIF、WebP，最大 5MB</span>
       </div>
     </div>
 
-    <div v-else class="relative rounded-xl overflow-hidden">
-      <img :src="modelValue" alt="封面图" class="w-full h-48 object-cover" loading="lazy" decoding="async" />
-      <button
-        @click="handleRemove"
-        class="absolute top-2 right-2 w-8 h-8 bg-black/50 rounded-full flex items-center justify-center hover:bg-black/70 transition-colors"
-      >
-        <X :size="16" class="text-white" />
+    <div v-else class="uploader__preview">
+      <img :src="modelValue" alt="封面图" loading="lazy" decoding="async" />
+
+      <button class="uploader__remove" title="移除图片" @click="handleRemove">
+        <n-icon :component="X" :size="15" />
       </button>
-      <button
-        @click="handleClick"
-        class="absolute bottom-2 right-2 px-3 py-1.5 bg-black/50 rounded-lg text-white text-sm hover:bg-black/70 transition-colors"
-      >
-        更换图片
-      </button>
+
+      <button class="uploader__replace" @click="handleClick">更换图片</button>
     </div>
 
     <input
       ref="fileInputRef"
       type="file"
       accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
-      class="hidden"
+      class="uploader__input"
       @change="handleFileChange"
     />
 
-    <p v-if="error" class="text-xs text-red-500 mt-2">{{ error }}</p>
+    <p v-if="error" class="uploader__error">{{ error }}</p>
   </div>
 </template>
+
+<style scoped lang="scss">
+@use '../../styles/variables' as *;
+@use '../../styles/mixins' as *;
+
+.uploader {
+  &__dropzone {
+    @include flex(column, center, center, $sp-2);
+    padding: $sp-10 $sp-4;
+    text-align: center;
+    cursor: pointer;
+    border: 1px dashed var(--nb-border-strong);
+    border-radius: $radius-lg;
+    background-color: var(--nb-surface);
+    transition: border-color $dur-base $ease, background-color $dur-base $ease;
+
+    &:hover {
+      border-color: var(--nb-brand);
+      background-color: var(--nb-surface-subtle);
+    }
+
+    &.is-active {
+      border-color: var(--nb-brand);
+      background-color: var(--nb-brand-subtle);
+    }
+  }
+
+  &__state {
+    @include flex(column, center, center, $sp-1);
+    min-height: 64px;
+  }
+
+  &__icon {
+    color: var(--nb-text-tertiary);
+  }
+
+  &__text {
+    font-size: $fs-base;
+    color: var(--nb-text-secondary);
+  }
+
+  &__hint {
+    font-size: $fs-xs;
+    color: var(--nb-text-tertiary);
+  }
+
+  &__state-text {
+    font-size: $fs-sm;
+    color: var(--nb-text-secondary);
+  }
+
+  &__preview {
+    position: relative;
+    border-radius: $radius-lg;
+    overflow: hidden;
+    border: 1px solid var(--nb-border);
+
+    img {
+      width: 100%;
+      height: 192px;
+      object-fit: cover;
+      display: block;
+    }
+  }
+
+  &__remove {
+    position: absolute;
+    top: $sp-2;
+    right: $sp-2;
+    @include flex(row, center, center);
+    width: 30px;
+    height: 30px;
+    border-radius: $radius-full;
+    color: #fff;
+    background-color: var(--nb-overlay);
+    transition: background-color $dur-fast $ease;
+
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.8);
+    }
+  }
+
+  &__replace {
+    position: absolute;
+    right: $sp-2;
+    bottom: $sp-2;
+    padding: $sp-1 $sp-3;
+    font-size: $fs-sm;
+    color: #fff;
+    border-radius: $radius-md;
+    background-color: var(--nb-overlay);
+    transition: background-color $dur-fast $ease;
+
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.8);
+    }
+  }
+
+  &__input {
+    display: none;
+  }
+
+  &__error {
+    margin-top: $sp-2;
+    font-size: $fs-xs;
+    color: var(--nb-danger);
+  }
+}
+</style>

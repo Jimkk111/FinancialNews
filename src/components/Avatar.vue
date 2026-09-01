@@ -4,11 +4,12 @@ import { ref, computed } from 'vue'
 interface Props {
   src?: string
   alt?: string
-  class?: string
+  size?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  alt: 'Avatar'
+  alt: 'Avatar',
+  size: 40,
 })
 
 const emit = defineEmits<{
@@ -26,30 +27,47 @@ const showImage = computed(() => props.src && !imageError.value)
 </script>
 
 <template>
-  <span
-    data-slot="avatar"
-    :class="[
-      'relative flex shrink-0 overflow-hidden rounded-full',
-      'size-10',
-      props.class
-    ]"
-  >
+  <span class="nb-avatar" :style="{ width: `${size}px`, height: `${size}px` }">
     <img
       v-if="showImage"
       :src="src"
       :alt="alt"
-      data-slot="avatar-image"
-      class="aspect-square size-full object-cover"
+      class="nb-avatar__img"
       loading="lazy"
       decoding="async"
       @error="handleImageError"
     />
-    <span
-      v-else
-      data-slot="avatar-fallback"
-      class="flex size-full items-center justify-center rounded-full bg-muted"
-    >
+    <span v-else class="nb-avatar__fallback">
       <slot />
     </span>
   </span>
 </template>
+
+<style scoped lang="scss">
+@use '../styles/variables' as *;
+
+.nb-avatar {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: $radius-full;
+  background-color: var(--nb-surface-subtle);
+
+  &__img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  &__fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    color: var(--nb-text-tertiary);
+    background-color: var(--nb-surface-subtle);
+  }
+}
+</style>

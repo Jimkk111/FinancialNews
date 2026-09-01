@@ -1,0 +1,181 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+
+// ============================================================
+// naive-ui 全局微调：让组件贴合 Notion 视觉语言
+// （主题级颜色由 src/styles/naive-theme.ts 通过 themeOverrides 控制）
+// ============================================================
+
+// 组件统一使用项目字体
+.n-button,
+.n-input,
+.n-base-selection,
+.n-dialog,
+.n-popover,
+.n-dropdown,
+.n-message,
+.n-card,
+.n-tag {
+  font-family: $nb-font-sans;
+}
+
+// 按钮：Notion 风格偏方、偏紧凑
+.n-button {
+  font-weight: $fw-medium;
+  letter-spacing: 0.01em;
+}
+
+// 输入框：更轻的边框
+.n-input {
+  transition: border-color $dur-base $ease, box-shadow $dur-base $ease;
+}
+
+// 卡片：去掉过重的阴影
+.n-card {
+  --n-border-radius: #{$radius-lg};
+}
+
+// 弹窗
+.n-dialog {
+  --n-border-radius: #{$radius-lg};
+}
+
+// 消息提示
+.n-message {
+  --n-border-radius: #{$radius-md};
+}
+
+// 下拉菜单
+.n-dropdown-menu {
+  --n-border-radius: #{$radius-md};
+}
+
+// 标签
+.n-tag {
+  --n-border-radius: #{$radius-sm};
+}
+
+// ---------- AI 消息 Markdown 排版 ----------
+.nb-markdown {
+  font-size: $fs-base;
+  line-height: $lh-relaxed;
+  color: var(--nb-text);
+  word-break: break-word;
+
+  > *:first-child {
+    margin-top: 0;
+  }
+
+  > *:last-child {
+    margin-bottom: 0;
+  }
+
+  p {
+    margin: 0.6em 0;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-weight: $fw-semibold;
+    line-height: $lh-tight;
+    margin: 1em 0 0.5em;
+  }
+
+  h1 {
+    font-size: 1.2rem;
+  }
+
+  h2 {
+    font-size: 1.1rem;
+  }
+
+  h3 {
+    font-size: 1rem;
+  }
+
+  ul,
+  ol {
+    margin: 0.6em 0;
+    padding-left: 1.4em;
+  }
+
+  ul {
+    list-style-type: disc;
+  }
+
+  ol {
+    list-style-type: decimal;
+  }
+
+  li {
+    margin-bottom: 0.25em;
+  }
+
+  strong {
+    font-weight: $fw-semibold;
+  }
+
+  a {
+    color: var(--nb-brand);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  code {
+    background-color: var(--nb-code-bg);
+    border-radius: $radius-sm;
+    padding: 0.15em 0.35em;
+    font-family: $nb-font-mono;
+    font-size: 0.85em;
+  }
+
+  pre {
+    background-color: var(--nb-pre-bg);
+    border: 1px solid var(--nb-border);
+    border-radius: $radius-md;
+    padding: 0.85em 1em;
+    margin: 0.8em 0;
+    overflow-x: auto;
+  }
+
+  pre code {
+    background-color: transparent;
+    padding: 0;
+    font-size: 0.85em;
+    line-height: 1.6;
+  }
+
+  blockquote {
+    border-left: 3px solid var(--nb-border-strong);
+    padding-left: 0.8em;
+    margin: 0.8em 0;
+    color: var(--nb-text-secondary);
+  }
+
+  hr {
+    border: none;
+    border-top: 1px solid var(--nb-divider);
+    margin: 1em 0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.8em 0;
+    font-size: $fs-sm;
+  }
+
+  th,
+  td {
+    border: 1px solid var(--nb-border);
+    padding: 0.45em 0.7em;
+    text-align: left;
+  }
+
+  th {
+    background-color: var(--nb-surface-subtle);
+    font-weight: $fw-semibold;
+  }
+}

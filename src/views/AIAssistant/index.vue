@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { MessageSquare, Plus, Loader2, Sparkles } from 'lucide-vue-next'
+import { NDrawer, NDrawerContent, NIcon, NSpin } from 'naive-ui'
+import { MessageSquare, Plus } from 'lucide-vue-next'
 import { useAiSessionStore } from '@/stores/aiSession'
 import BottomNav from '@/components/BottomNav.vue'
 import ChatArea from './ChatArea.vue'
@@ -10,6 +11,14 @@ import SessionSidebar from './SessionSidebar.vue'
 
 const router = useRouter()
 const store = useAiSessionStore()
+
+const sidebarOpen = computed({
+  get: () => store.sidebarOpen,
+  set: (value) => {
+    if (value) store.toggleSidebar()
+    else store.closeSidebar()
+  },
+})
 
 const handleTabChange = (tab: string) => {
   const routePath = tab === 'home' ? '/' : `/${tab}`
@@ -30,82 +39,117 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-col h-screen bg-muted">
-    <header class="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-      <div class="flex items-center justify-between px-4 py-3 max-w-md mx-auto">
-        <button
-          @click="store.toggleSidebar"
-          class="p-2 -ml-2 hover:bg-white/20 rounded-full transition-colors active:scale-95"
-        >
-          <MessageSquare :size="20" />
+  <div class="ai">
+    <header class="ai__header">
+      <div class="ai__header-inner">
+        <button class="nb-icon-btn ai__header-btn" title="历史会话" @click="store.toggleSidebar">
+          <n-icon :component="MessageSquare" :size="18" />
         </button>
 
-        <div class="flex items-center gap-2">
-          <Sparkles :size="18" />
-          <span class="font-medium">AI助手</span>
+        <div class="ai__brand">
+          <span class="ai__brand-dot" />
+          <span class="ai__brand-text">AI 助手</span>
         </div>
 
         <button
-          @click="handleNewConversation"
+          class="nb-icon-btn ai__header-btn"
+          title="新建会话"
           :disabled="store.isLoading || store.isSending"
-          class="p-2 -mr-2 hover:bg-white/20 rounded-full transition-colors active:scale-95 disabled:opacity-50"
+          @click="handleNewConversation"
         >
-          <Loader2 v-if="store.isLoading" :size="18" class="animate-spin" />
-          <Plus v-else :size="20" />
+          <n-spin v-if="store.isLoading" size="small" />
+          <n-icon v-else :component="Plus" :size="18" />
         </button>
       </div>
     </header>
 
-    <Transition name="sidebar">
-      <div
-        v-if="store.sidebarOpen"
-        class="fixed inset-0 z-40 bg-black/50"
-        @click="store.closeSidebar"
-      >
-        <div
-          class="absolute left-0 top-14 bottom-16 w-4/5 max-w-xs bg-card shadow-xl overflow-hidden"
-          @click.stop
-        >
-          <SessionSidebar />
-        </div>
-      </div>
-    </Transition>
-
-    <main class="flex-1 flex flex-col overflow-hidden">
+    <main class="ai__main">
       <ChatArea />
-
-      <div class="fixed bottom-16 left-0 right-0 z-30">
-        <InputArea
-          :disabled="!store.isServiceHealthy"
-          :is-sending="store.isSending"
-          :is-loading="store.isLoading"
-          @send="handleSend"
-        />
-      </div>
     </main>
 
+    <div class="ai__input">
+      <InputArea
+        :disabled="!store.isServiceHealthy"
+        :is-sending="store.isSending"
+        :is-loading="store.isLoading"
+        @send="handleSend"
+      />
+    </div>
+
     <BottomNav active-tab="ai" @tab-change="handleTabChange" />
+
+    <n-drawer v-model:show="sidebarOpen" placement="left" :width="300" :auto-focus="false">
+      <n-drawer-content title="历史会话" closable body-content-style="padding: 0">
+        <SessionSidebar />
+      </n-drawer-content>
+    </n-drawer>
   </div>
 </template>
 
-<style scoped>
-.sidebar-enter-active,
-.sidebar-leave-active {
-  transition: opacity 0.3s ease;
-}
+<style scoped lang="scss">
+@use '../../styles/variables' as *;
+@use '../../styles/mixins' as *;
 
-.sidebar-enter-active .absolute,
-.sidebar-leave-active .absolute {
-  transition: transform 0.3s ease;
-}
+.ai {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--nb-bg);
 
-.sidebar-enter-from,
-.sidebar-leave-to {
-  opacity: 0;
-}
+  &__header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: $z-header;
+    height: $header-height;
+    background-color: var(--nb-surface);
+    border-bottom: 1px solid var(--nb-border);
+  }
 
-.sidebar-enter-from .absolute,
-.sidebar-leave-to .absolute {
-  transform: translateX(-100%);
+  &__header-inner {
+    max-width: 720px;
+    height: 100%;
+    margin: 0 auto;
+    padding: 0 $sp-3;
+    @include flex(row, space-between, center);
+  }
+
+  &__header-btn {
+    color: var(--nb-text-secondary);
+  }
+
+  &__brand {
+    @include flex(row, center, center, $sp-2);
+  }
+
+  &__brand-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: $radius-full;
+    background-color: var(--nb-brand);
+  }
+
+  &__brand-text {
+    font-size: $fs-md;
+    font-weight: $fw-medium;
+    color: var(--nb-text);
+  }
+
+  &__main {
+    flex: 1;
+    min-height: 0;
+    padding-top: $header-height;
+    padding-bottom: calc(#{$bottom-nav-height} + 120px);
+  }
+
+  &__input {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: $bottom-nav-height;
+    z-index: $z-sticky;
+    background-color: var(--nb-bg);
+  }
 }
 </style>

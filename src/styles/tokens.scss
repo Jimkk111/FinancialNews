@@ -1,0 +1,95 @@
+// ============================================================
+// 设计令牌（CSS 自定义属性）
+// Notion 风格：低饱和中性色 + 克制的分隔线 + 清晰的文字层级
+// 浅色为默认，`.dark` 类挂在 <html> 上时切换到深色
+// ============================================================
+
+:root {
+  // 背景
+  --nb-bg: #ffffff;
+  --nb-bg-subtle: #fbfbfa;
+  --nb-surface: #ffffff;
+  --nb-surface-subtle: #f7f7f5;
+  --nb-hover: rgba(55, 53, 47, 0.06);
+  --nb-active: rgba(55, 53, 47, 0.09);
+  --nb-overlay: rgba(15, 15, 15, 0.6);
+
+  // 文字（Notion 三级灰阶）
+  --nb-text: #37352f;
+  --nb-text-secondary: #787774;
+  --nb-text-tertiary: #9b9a97;
+  --nb-text-disabled: #c4c4c1;
+
+  // 边框
+  --nb-border: rgba(55, 53, 47, 0.09);
+  --nb-border-strong: rgba(55, 53, 47, 0.16);
+  --nb-divider: rgba(55, 53, 47, 0.09);
+
+  // 品牌与语义色
+  --nb-brand: #d92e2e;
+  --nb-brand-hover: #c02727;
+  --nb-brand-pressed: #ad2323;
+  --nb-brand-subtle: rgba(217, 46, 46, 0.08);
+  --nb-danger: #d44c47;
+  --nb-danger-subtle: rgba(212, 76, 71, 0.1);
+  --nb-success: #0f7b6c;
+  --nb-success-subtle: rgba(15, 123, 108, 0.1);
+  --nb-warning: #cb912f;
+  --nb-warning-subtle: rgba(203, 145, 47, 0.12);
+  --nb-info: #2383e2;
+  --nb-info-subtle: rgba(35, 131, 226, 0.1);
+
+  // 代码块
+  --nb-code-bg: rgba(135, 131, 120, 0.15);
+  --nb-pre-bg: #f7f6f3;
+
+  // 阴影（Notion 用极轻的阴影，浮层才用明显的）
+  --nb-shadow-sm: 0 1px 2px rgba(15, 15, 15, 0.05);
+  --nb-shadow-md: rgba(15, 15, 15, 0.05) 0px 0px 0px 1px,
+    rgba(15, 15, 15, 0.1) 0px 3px 6px, rgba(15, 15, 15, 0.2) 0px 9px 24px;
+}
+
+.dark {
+  // 背景
+  --nb-bg: #191919;
+  --nb-bg-subtle: #1f1f1f;
+  --nb-surface: #202020;
+  --nb-surface-subtle: #2a2a2a;
+  --nb-hover: rgba(255, 255, 255, 0.055);
+  --nb-active: rgba(255, 255, 255, 0.09);
+  --nb-overlay: rgba(0, 0, 0, 0.7);
+
+  // 文字
+  --nb-text: rgba(255, 255, 255, 0.81);
+  --nb-text-secondary: rgba(255, 255, 255, 0.55);
+  --nb-text-tertiary: rgba(255, 255, 255, 0.36);
+  --nb-text-disabled: rgba(255, 255, 255, 0.25);
+
+  // 边框
+  --nb-border: rgba(255, 255, 255, 0.094);
+  --nb-border-strong: rgba(255, 255, 255, 0.18);
+  --nb-divider: rgba(255, 255, 255, 0.094);
+
+  // 品牌与语义色
+  --nb-brand: #e5484d;
+  --nb-brand-hover: #ec5d62;
+  --nb-brand-pressed: #dc3d43;
+  --nb-brand-subtle: rgba(229, 72, 77, 0.14);
+  --nb-danger: #e5484d;
+  --nb-danger-subtle: rgba(229, 72, 77, 0.14);
+  --nb-success: #30a46c;
+  --nb-success-subtle: rgba(48, 164, 108, 0.16);
+  --nb-warning: #daa94a;
+  --nb-warning-subtle: rgba(218, 169, 74, 0.16);
+  --nb-info: #3e97eb;
+  --nb-info-subtle: rgba(62, 151, 235, 0.16);
+
+  // 代码块
+  --nb-code-bg: rgba(255, 255, 255, 0.1);
+  --nb-pre-bg: #252525;
+
+  // 阴影
+  --nb-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --nb-shadow-md: rgba(0, 0, 0, 0.2) 0px 0px 0px 1px,
+    rgba(0, 0, 0, 0.3) 0px 3px 6px, rgba(0, 0, 0, 0.4) 0px 9px 24px;
+}

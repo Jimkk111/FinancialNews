@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, FileText, Edit, Trash2 } from 'lucide-vue-next'
+import { NIcon, NPopconfirm, NSpin } from 'naive-ui'
+import { ArrowLeft, Edit, FileText, Trash2 } from 'lucide-vue-next'
 import { getDraftsList, deleteDraftService } from '@/services/newsEditorService'
 import { formatTime } from '@/utils/format'
 import type { NewsDraft } from '@/types'
@@ -41,83 +42,179 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-muted">
-    <header class="fixed top-0 left-0 right-0 z-50 bg-card border-b border-border">
-      <div class="flex items-center justify-between px-4 py-3 max-w-md mx-auto">
-        <button
-          @click="handleBack"
-          class="p-2 -ml-2 hover:bg-muted rounded-full transition-colors"
-        >
-          <ArrowLeft :size="20" />
+  <div class="nb-page">
+    <header class="nb-page-header">
+      <div class="nb-page-header__inner nb-page-header__inner--narrow">
+        <button class="nb-icon-btn" title="返回" @click="handleBack">
+          <n-icon :component="ArrowLeft" :size="18" />
         </button>
-        <h1 class="text-lg font-semibold text-foreground">草稿箱</h1>
-        <div class="w-10"></div>
+        <span class="nb-page-header__title">草稿箱</span>
+        <div class="nb-page-header__side"></div>
       </div>
     </header>
 
-    <main class="pt-14 pb-4 px-4 max-w-md mx-auto">
-      <div v-if="loading" class="flex items-center justify-center py-12">
-        <div class="text-muted-foreground">加载中...</div>
+    <main class="nb-page-body drafts">
+      <div v-if="loading" class="drafts__state">
+        <n-spin size="large" />
       </div>
 
-      <div v-else-if="drafts.length === 0" class="flex flex-col items-center justify-center py-12">
-        <FileText :size="48" class="text-muted-foreground/50 mb-4" />
-        <p class="text-muted-foreground">暂无草稿</p>
+      <div v-else-if="drafts.length === 0" class="nb-placeholder">
+        <n-icon :component="FileText" :size="44" />
+        <p class="nb-placeholder__title">暂无草稿</p>
       </div>
 
-      <div v-else class="space-y-3 pt-4">
-        <div
-          v-for="draft in drafts"
-          :key="draft.id"
-          class="bg-card rounded-xl p-4 shadow-sm border border-border"
-        >
-          <div class="flex gap-3">
-            <div
-              v-if="draft.coverImage"
-              class="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-muted"
-            >
+      <ul v-else class="drafts__list">
+        <li v-for="draft in drafts" :key="draft.id" class="drafts__card">
+          <div class="drafts__body">
+            <div v-if="draft.coverImage" class="drafts__cover">
               <img
                 :src="draft.coverImage"
                 :alt="draft.title"
-                class="w-full h-full object-cover"
                 loading="lazy"
                 decoding="async"
               />
             </div>
-            <div
-              v-else
-              class="w-20 h-20 flex-shrink-0 rounded-lg bg-muted flex items-center justify-center"
-            >
-              <FileText :size="24" class="text-muted-foreground" />
+            <div v-else class="drafts__cover drafts__cover--empty">
+              <n-icon :component="FileText" :size="22" />
             </div>
 
-            <div class="flex-1 min-w-0">
-              <h3 class="text-base font-medium text-foreground line-clamp-2 mb-1">
-                {{ draft.title || '无标题' }}
-              </h3>
-              <p class="text-xs text-muted-foreground mb-2">
-                {{ formatTime(draft.updatedAt) }}
-              </p>
-              <div class="flex items-center gap-2">
-                <button
-                  @click="handleEdit(draft.id)"
-                  class="flex items-center gap-1 px-3 py-1 text-xs text-brand hover:bg-brand/10 rounded-lg transition-colors"
-                >
-                  <Edit :size="12" />
+            <div class="drafts__info">
+              <h3 class="drafts__title">{{ draft.title || '无标题' }}</h3>
+              <p class="drafts__time">{{ formatTime(draft.updatedAt) }}</p>
+
+              <div class="drafts__actions">
+                <button class="drafts__action drafts__action--primary" @click="handleEdit(draft.id)">
+                  <n-icon :component="Edit" :size="13" />
                   <span>继续编辑</span>
                 </button>
-                <button
-                  @click="handleDelete(draft.id)"
-                  class="flex items-center gap-1 px-3 py-1 text-xs text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors"
+
+                <n-popconfirm
+                  positive-text="删除"
+                  negative-text="取消"
+                  :positive-button-props="{ type: 'error' }"
+                  @positive-click="handleDelete(draft.id)"
                 >
-                  <Trash2 :size="12" />
-                  <span>删除</span>
-                </button>
+                  <template #trigger>
+                    <button class="drafts__action drafts__action--danger">
+                      <n-icon :component="Trash2" :size="13" />
+                      <span>删除</span>
+                    </button>
+                  </template>
+                  确定删除这份草稿吗？
+                </n-popconfirm>
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        </li>
+      </ul>
     </main>
   </div>
 </template>
+
+<style scoped lang="scss">
+@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
+.drafts {
+  background-color: var(--nb-bg-subtle);
+  min-height: 100vh;
+
+  &__state {
+    @include flex(row, center, center);
+    padding: $sp-12 $sp-4;
+  }
+
+  &__list {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: $sp-4;
+    display: flex;
+    flex-direction: column;
+    gap: $sp-3;
+  }
+
+  &__card {
+    @include card($radius-lg);
+    transition: box-shadow $dur-base $ease;
+
+    &:hover {
+      box-shadow: var(--nb-shadow-sm);
+    }
+  }
+
+  &__body {
+    @include flex(row, flex-start, flex-start, $sp-3);
+    padding: $sp-4;
+  }
+
+  &__cover {
+    flex-shrink: 0;
+    width: 76px;
+    height: 76px;
+    border-radius: $radius-md;
+    overflow: hidden;
+    background-color: var(--nb-surface-subtle);
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    &--empty {
+      @include flex(row, center, center);
+      color: var(--nb-text-tertiary);
+    }
+  }
+
+  &__info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__title {
+    font-size: $fs-lg;
+    font-weight: $fw-medium;
+    line-height: 1.45;
+    color: var(--nb-text);
+    margin-bottom: $sp-1;
+    @include line-clamp(2);
+  }
+
+  &__time {
+    font-size: $fs-xs;
+    color: var(--nb-text-tertiary);
+    margin-bottom: $sp-3;
+  }
+
+  &__actions {
+    @include flex(row, flex-start, center, $sp-2);
+  }
+
+  &__action {
+    @include flex(row, center, center, 4px);
+    padding: $sp-1 $sp-2;
+    font-size: $fs-xs;
+    border-radius: $radius-md;
+    transition: background-color $dur-fast $ease, color $dur-fast $ease;
+
+    &--primary {
+      color: var(--nb-brand);
+      background-color: var(--nb-brand-subtle);
+
+      &:hover {
+        background-color: var(--nb-hover);
+      }
+    }
+
+    &--danger {
+      color: var(--nb-text-tertiary);
+
+      &:hover {
+        color: var(--nb-danger);
+        background-color: var(--nb-danger-subtle);
+      }
+    }
+  }
+}
+</style>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { reactive, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { NIcon, NPopconfirm, NSpin } from 'naive-ui'
 import { ArrowLeft, Clock, Eye, Heart, Trash2 } from 'lucide-vue-next'
 import { getFavorites, removeFavorite } from '@/services/userService'
 import { useAuthStore } from '@/stores/auth'
@@ -50,7 +51,7 @@ const fetchFavorites = async () => {
   try {
     const response = await getFavorites(
       state.pagination.page,
-      state.pagination.pageSize,
+      state.pagination.pageSize
     )
 
     if (response.success && response.data) {
@@ -69,9 +70,7 @@ const fetchFavorites = async () => {
   }
 }
 
-const handleRemoveFavorite = async (newsId: number, e: Event) => {
-  e.stopPropagation()
-
+const handleRemoveFavorite = async (newsId: number) => {
   if (!uid) return
 
   try {
@@ -95,70 +94,134 @@ onMounted(fetchFavorites)
 </script>
 
 <template>
-  <div class="min-h-screen bg-muted">
-    <header class="fixed top-0 left-0 right-0 z-50 bg-card border-b border-border">
-      <div class="flex items-center justify-between px-4 py-3 max-w-md mx-auto">
-        <button
-          @click="handleBack"
-          class="p-2 -ml-2 hover:bg-muted rounded-full transition-colors"
-        >
-          <ArrowLeft :size="20" />
+  <div class="nb-page">
+    <header class="nb-page-header">
+      <div class="nb-page-header__inner nb-page-header__inner--narrow">
+        <button class="nb-icon-btn" title="返回" @click="handleBack">
+          <n-icon :component="ArrowLeft" :size="18" />
         </button>
-        <span class="font-medium">我的收藏</span>
-        <div class="w-8"></div>
+        <span class="nb-page-header__title">我的收藏</span>
+        <div class="nb-page-header__side"></div>
       </div>
     </header>
 
-    <main class="pt-14 pb-16">
-      <div v-if="state.loading" class="flex items-center justify-center h-64">
-        <div class="text-muted-foreground">加载中...</div>
+    <main class="nb-page-body list-page">
+      <div v-if="state.loading" class="list-page__state">
+        <n-spin size="large" />
       </div>
 
-      <div v-else-if="state.error" class="flex items-center justify-center h-64">
-        <div class="text-red-500">{{ state.error }}</div>
+      <div v-else-if="state.error" class="list-page__state">
+        <p class="nb-alert nb-alert--error">{{ state.error }}</p>
       </div>
 
-      <div v-else-if="state.items.length > 0" class="divide-y divide-border">
-        <div
+      <ul v-else-if="state.items.length > 0" class="list-page__list">
+        <li
           v-for="item in state.items"
           :key="item.newsId"
-          class="bg-card p-4 hover:bg-muted transition-colors"
+          class="list-page__item"
           @click="handleNewsClick(item.newsId)"
         >
-          <div class="flex flex-col gap-3">
-            <h3 class="text-base font-medium text-foreground leading-relaxed">
-              {{ item.title }}
-            </h3>
+          <h3 class="list-page__title">{{ item.title }}</h3>
 
-            <div class="flex items-center justify-between text-xs text-muted-foreground">
-              <div class="flex items-center gap-3">
-                <span class="text-blue-600">{{ item.source }}</span>
-                <div class="flex items-center gap-1">
-                  <Clock :size="12" />
-                  <span>{{ formatTime(item.publishTime) }}</span>
-                </div>
-                <div class="flex items-center gap-1">
-                  <Eye :size="12" />
-                  <span>{{ item.views }} 阅读</span>
-                </div>
-              </div>
-              <button
-                @click="handleRemoveFavorite(item.newsId, $event)"
-                class="p-1 text-muted-foreground hover:text-red-500 transition-colors"
-                title="取消收藏"
-              >
-                <Trash2 :size="16" />
-              </button>
-            </div>
+          <div class="list-page__meta">
+            <span class="list-page__source">{{ item.source }}</span>
+            <span class="list-page__meta-item">
+              <n-icon :component="Clock" :size="12" />
+              {{ formatTime(item.publishTime) }}
+            </span>
+            <span class="list-page__meta-item">
+              <n-icon :component="Eye" :size="12" />
+              {{ item.views }} 阅读
+            </span>
+
+            <n-popconfirm
+              positive-text="取消收藏"
+              negative-text="再想想"
+              @positive-click="handleRemoveFavorite(item.newsId)"
+            >
+              <template #trigger>
+                <button
+                  class="nb-icon-btn is-danger list-page__action"
+                  title="取消收藏"
+                  @click.stop
+                >
+                  <n-icon :component="Trash2" :size="15" />
+                </button>
+              </template>
+              确定取消收藏这篇新闻吗？
+            </n-popconfirm>
           </div>
-        </div>
-      </div>
+        </li>
+      </ul>
 
-      <div v-else class="flex flex-col items-center justify-center h-64">
-        <Heart class="text-muted-foreground/50" :size="48" />
-        <p class="text-muted-foreground mt-3">暂无收藏内容</p>
-        <p class="text-muted-foreground/70 text-sm mt-1">收藏的新闻会显示在这里</p>
+      <div v-else class="nb-placeholder">
+        <n-icon :component="Heart" :size="44" />
+        <p class="nb-placeholder__title">暂无收藏内容</p>
+        <p class="nb-placeholder__desc">收藏的新闻会显示在这里</p>
       </div>
     </main>
   </div>
 </template>
+
+<style scoped lang="scss">
+@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
+.list-page {
+  background-color: var(--nb-bg-subtle);
+  min-height: 100vh;
+
+  &__state {
+    @include flex(row, center, center);
+    padding: $sp-12 $sp-4;
+  }
+
+  &__list {
+    background-color: var(--nb-surface);
+    border-bottom: 1px solid var(--nb-border);
+  }
+
+  &__item {
+    padding: $sp-4;
+    cursor: pointer;
+    border-bottom: 1px solid var(--nb-divider);
+    transition: background-color $dur-fast $ease;
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    &:hover {
+      background-color: var(--nb-hover);
+    }
+  }
+
+  &__title {
+    font-size: $fs-lg;
+    font-weight: $fw-medium;
+    line-height: 1.6;
+    color: var(--nb-text);
+    margin-bottom: $sp-2;
+  }
+
+  &__meta {
+    @include flex(row, flex-start, center, $sp-3);
+    flex-wrap: wrap;
+    font-size: $fs-xs;
+    color: var(--nb-text-tertiary);
+  }
+
+  &__source {
+    color: var(--nb-brand);
+    font-weight: $fw-medium;
+  }
+
+  &__meta-item {
+    @include flex(row, flex-start, center, 4px);
+  }
+
+  &__action {
+    margin-left: auto;
+  }
+}
+</style>

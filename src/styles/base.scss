@@ -1,0 +1,128 @@
+// ============================================================
+// 全局基础样式：reset + 元素默认值
+// ============================================================
+
+@use 'variables' as *;
+@use 'mixins' as *;
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  font-family: $nb-font-sans;
+  font-size: $fs-base;
+  line-height: $lh-normal;
+  color: var(--nb-text);
+  background-color: var(--nb-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color $dur-base $ease, color $dur-base $ease;
+}
+
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+}
+
+button {
+  cursor: pointer;
+  &:disabled {
+    cursor: not-allowed;
+  }
+}
+
+a {
+  color: var(--nb-brand);
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-size: inherit;
+  font-weight: $fw-semibold;
+  line-height: $lh-tight;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+// 全局滚动条（Notion 风格：细、浅、hover 才明显）
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--nb-border-strong);
+  border-radius: $radius-full;
+  &:hover {
+    background-color: var(--nb-text-tertiary);
+  }
+}
+
+::selection {
+  background-color: var(--nb-brand-subtle);
+}
+
+// ---------- 通用工具类 ----------
+.nb-ellipsis {
+  @include ellipsis;
+}
+
+.nb-clamp-2 {
+  @include line-clamp(2);
+}
+
+.nb-hide-scrollbar {
+  @include hide-scrollbar;
+}
+
+.nb-text-secondary {
+  color: var(--nb-text-secondary);
+}
+
+.nb-text-tertiary {
+  color: var(--nb-text-tertiary);
+}

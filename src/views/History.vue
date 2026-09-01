@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { reactive, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Clock, Eye, BookOpen } from 'lucide-vue-next'
+import { NIcon, NSpin } from 'naive-ui'
+import { ArrowLeft, BookOpen, Clock, Eye } from 'lucide-vue-next'
 import { getHistory } from '@/services/userService'
 import { useAuthStore } from '@/stores/auth'
 import { formatTime } from '@/utils/format'
@@ -50,7 +51,7 @@ const fetchHistory = async () => {
   try {
     const response = await getHistory(
       state.pagination.page,
-      state.pagination.pageSize,
+      state.pagination.pageSize
     )
 
     if (response.success && response.data) {
@@ -76,70 +77,125 @@ onMounted(fetchHistory)
 </script>
 
 <template>
-  <div class="min-h-screen bg-muted">
-    <header class="fixed top-0 left-0 right-0 z-50 bg-card border-b border-border">
-      <div class="flex items-center justify-between px-4 py-3 max-w-md mx-auto">
-        <button
-          @click="handleBack"
-          class="p-2 -ml-2 hover:bg-muted rounded-full transition-colors"
-        >
-          <ArrowLeft :size="20" />
+  <div class="nb-page">
+    <header class="nb-page-header">
+      <div class="nb-page-header__inner nb-page-header__inner--narrow">
+        <button class="nb-icon-btn" title="返回" @click="handleBack">
+          <n-icon :component="ArrowLeft" :size="18" />
         </button>
-        <span class="font-medium">阅读历史</span>
-        <div class="w-8"></div>
+        <span class="nb-page-header__title">阅读历史</span>
+        <div class="nb-page-header__side"></div>
       </div>
     </header>
 
-    <main class="pt-14 pb-16">
-      <div v-if="state.loading" class="flex items-center justify-center h-64">
-        <div class="text-muted-foreground">加载中...</div>
+    <main class="nb-page-body list-page">
+      <div v-if="state.loading" class="list-page__state">
+        <n-spin size="large" />
       </div>
 
-      <div v-else-if="state.error" class="flex items-center justify-center h-64">
-        <div class="text-red-500">{{ state.error }}</div>
+      <div v-else-if="state.error" class="list-page__state">
+        <p class="nb-alert nb-alert--error">{{ state.error }}</p>
       </div>
 
-      <div v-else-if="state.items.length > 0" class="divide-y divide-border">
-        <div
+      <ul v-else-if="state.items.length > 0" class="list-page__list">
+        <li
           v-for="item in state.items"
           :key="item.newsId"
-          class="bg-card p-4 hover:bg-muted transition-colors"
+          class="list-page__item"
           @click="handleNewsClick(item.newsId)"
         >
-          <div class="flex flex-col gap-3">
-            <h3 class="text-base font-medium text-foreground leading-relaxed">
-              {{ item.title }}
-            </h3>
+          <h3 class="list-page__title">{{ item.title }}</h3>
 
-            <div class="flex items-center justify-between text-xs text-muted-foreground">
-              <div class="flex items-center gap-3">
-                <span class="text-blue-600">{{ item.source }}</span>
-                <div class="flex items-center gap-1">
-                  <Clock :size="12" />
-                  <span>{{ formatTime(item.publishTime) }}</span>
-                </div>
-                <div class="flex items-center gap-1">
-                  <Eye :size="12" />
-                  <span>{{ item.views }} 阅读</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="flex items-center gap-2 text-xs text-muted-foreground/70">
-              <Clock :size="12" />
-              <span>
-                阅读于 {{ formatTime(item.viewedAt) }}
-              </span>
-            </div>
+          <div class="list-page__meta">
+            <span class="list-page__source">{{ item.source }}</span>
+            <span class="list-page__meta-item">
+              <n-icon :component="Clock" :size="12" />
+              {{ formatTime(item.publishTime) }}
+            </span>
+            <span class="list-page__meta-item">
+              <n-icon :component="Eye" :size="12" />
+              {{ item.views }} 阅读
+            </span>
           </div>
-        </div>
-      </div>
 
-      <div v-else class="flex flex-col items-center justify-center h-64">
-        <BookOpen class="text-muted-foreground/50" :size="48" />
-        <p class="text-muted-foreground mt-3">暂无阅读历史</p>
-        <p class="text-muted-foreground/70 text-sm mt-1">浏览过的新闻会显示在这里</p>
+          <div class="list-page__viewed">
+            <n-icon :component="Clock" :size="12" />
+            <span>阅读于 {{ formatTime(item.viewedAt) }}</span>
+          </div>
+        </li>
+      </ul>
+
+      <div v-else class="nb-placeholder">
+        <n-icon :component="BookOpen" :size="44" />
+        <p class="nb-placeholder__title">暂无阅读历史</p>
+        <p class="nb-placeholder__desc">浏览过的新闻会显示在这里</p>
       </div>
     </main>
   </div>
 </template>
+
+<style scoped lang="scss">
+@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
+.list-page {
+  background-color: var(--nb-bg-subtle);
+  min-height: 100vh;
+
+  &__state {
+    @include flex(row, center, center);
+    padding: $sp-12 $sp-4;
+  }
+
+  &__list {
+    background-color: var(--nb-surface);
+    border-bottom: 1px solid var(--nb-border);
+  }
+
+  &__item {
+    padding: $sp-4;
+    cursor: pointer;
+    border-bottom: 1px solid var(--nb-divider);
+    transition: background-color $dur-fast $ease;
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    &:hover {
+      background-color: var(--nb-hover);
+    }
+  }
+
+  &__title {
+    font-size: $fs-lg;
+    font-weight: $fw-medium;
+    line-height: 1.6;
+    color: var(--nb-text);
+    margin-bottom: $sp-2;
+  }
+
+  &__meta {
+    @include flex(row, flex-start, center, $sp-3);
+    flex-wrap: wrap;
+    font-size: $fs-xs;
+    color: var(--nb-text-tertiary);
+  }
+
+  &__source {
+    color: var(--nb-brand);
+    font-weight: $fw-medium;
+  }
+
+  &__meta-item {
+    @include flex(row, flex-start, center, 4px);
+  }
+
+  &__viewed {
+    @include flex(row, flex-start, center, 4px);
+    margin-top: $sp-2;
+    font-size: $fs-xs;
+    color: var(--nb-text-tertiary);
+  }
+}
+</style>

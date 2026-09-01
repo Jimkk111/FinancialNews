@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { NButton, NIcon, NInput, NSelect } from 'naive-ui'
 import { ArrowLeft, Save, Send } from 'lucide-vue-next'
 import ImageUploader from '@/components/editor/ImageUploader.vue'
 import TagSelector from '@/components/editor/TagSelector.vue'
@@ -48,6 +49,10 @@ const buildSnapshot = () =>
     content: content.value,
   })
 
+const categoryOptions = computed(() =>
+  categories.value.map((cat) => ({ label: cat.name, value: cat.id }))
+)
+
 const loadCategories = async () => {
   try {
     categories.value = await getNewsCategories()
@@ -77,9 +82,13 @@ const loadDraft = async () => {
   }
 }
 
-watch(() => draftId, () => {
-  loadDraft()
-}, { immediate: true })
+watch(
+  () => draftId,
+  () => {
+    loadDraft()
+  },
+  { immediate: true }
+)
 
 const saveDraft = async (showSuccess = true) => {
   if (saving.value) return
@@ -182,86 +191,105 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-muted">
-    <header class="fixed top-0 left-0 right-0 z-50 bg-card border-b border-border">
-      <div class="flex items-center justify-between px-4 py-3 max-w-4xl mx-auto">
-        <button
-          @click="handleBack"
-          class="p-2 -ml-2 hover:bg-muted rounded-full transition-colors"
-        >
-          <ArrowLeft :size="20" />
+  <div class="nb-page">
+    <header class="nb-page-header">
+      <div class="nb-page-header__inner nb-page-header__inner--wide">
+        <button class="nb-icon-btn" title="返回" @click="handleBack">
+          <n-icon :component="ArrowLeft" :size="18" />
         </button>
-        <h1 class="text-lg font-semibold text-foreground">发布新闻</h1>
-        <div class="flex items-center gap-2">
-          <button
-            @click="saveDraft()"
+        <span class="nb-page-header__title">发布新闻</span>
+
+        <div class="nb-page-header__side">
+          <n-button
+            size="small"
+            quaternary
+            :loading="saving"
             :disabled="saving"
-            class="flex items-center gap-1 px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted rounded-lg transition-colors disabled:opacity-50"
+            @click="saveDraft()"
           >
-            <Save :size="16" />
-            <span>{{ saving ? '保存中...' : '存草稿' }}</span>
-          </button>
-          <button
-            @click="publish"
+            <template #icon>
+              <n-icon :component="Save" />
+            </template>
+            存草稿
+          </n-button>
+
+          <n-button
+            size="small"
+            type="primary"
+            :loading="publishing"
             :disabled="publishing"
-            class="flex items-center gap-1 px-3 py-1.5 text-sm bg-brand text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50"
+            @click="publish"
           >
-            <Send :size="16" />
-            <span>{{ publishing ? '发布中...' : '发布' }}</span>
-          </button>
+            <template #icon>
+              <n-icon :component="Send" />
+            </template>
+            发布
+          </n-button>
         </div>
       </div>
     </header>
 
-    <main class="pt-14 pb-8">
-      <div class="max-w-4xl mx-auto px-4 py-4 space-y-4">
-        <div v-if="successMessage" class="bg-green-50 dark:bg-green-950 text-green-600 dark:text-green-400 text-sm px-4 py-2 rounded-lg">
-          {{ successMessage }}
-        </div>
+    <main class="nb-page-body editor">
+      <div class="editor__inner">
+        <p v-if="successMessage" class="nb-alert nb-alert--success">{{ successMessage }}</p>
+        <p v-if="error" class="nb-alert nb-alert--error">{{ error }}</p>
 
-        <div v-if="error" class="bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 text-sm px-4 py-2 rounded-lg">
-          {{ error }}
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium text-foreground mb-2">封面图片</label>
+        <div class="nb-field">
+          <label class="nb-field__label">封面图片</label>
           <ImageUploader v-model="coverImage" />
         </div>
 
-        <div>
-          <label class="block text-sm font-medium text-foreground mb-2">标题</label>
-          <input
-            v-model="title"
+        <div class="nb-field">
+          <label class="nb-field__label" for="editor-title">标题</label>
+          <n-input
+            id="editor-title"
+            v-model:value="title"
+            size="large"
             type="text"
             placeholder="请输入新闻标题"
             maxlength="100"
-            class="w-full px-4 py-3 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent text-base"
+            show-count
           />
-          <p class="text-xs text-muted-foreground mt-1 text-right">{{ title.length }}/100</p>
         </div>
 
-        <div>
-          <label class="block text-sm font-medium text-foreground mb-2">分类</label>
-          <select
-            v-model="selectedCategory"
-            class="w-full px-4 py-3 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent text-base appearance-none"
-          >
-            <option v-for="cat in categories" :key="cat.id" :value="cat.id">
-              {{ cat.name }}
-            </option>
-          </select>
+        <div class="nb-field">
+          <label class="nb-field__label" for="editor-category">分类</label>
+          <n-select
+            id="editor-category"
+            v-model:value="selectedCategory"
+            size="large"
+            placeholder="请选择分类"
+            :options="categoryOptions"
+          />
         </div>
 
-        <div>
-          <label class="block text-sm font-medium text-foreground mb-2">标签</label>
+        <div class="nb-field">
+          <label class="nb-field__label">标签</label>
           <TagSelector v-model="selectedTags" />
         </div>
 
-        <div>
-          <label class="block text-sm font-medium text-foreground mb-2">正文</label>
+        <div class="nb-field">
+          <label class="nb-field__label">正文</label>
           <TiptapEditor v-model="content" />
         </div>
       </div>
     </main>
   </div>
 </template>
+
+<style scoped lang="scss">
+@use '../styles/variables' as *;
+
+.editor {
+  background-color: var(--nb-bg-subtle);
+  min-height: 100vh;
+
+  &__inner {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: $sp-6 $sp-4 $sp-12;
+    display: flex;
+    flex-direction: column;
+  }
+}
+</style>

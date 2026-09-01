@@ -1,0 +1,191 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+
+// ============================================================
+// 跨组件复用的全局类（非 scoped，供各 SFC 直接引用）
+// ============================================================
+
+// ---------- 圆形图标按钮 ----------
+.nb-icon-btn {
+  @include flex(row, center, center);
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: $radius-md;
+  color: var(--nb-text-secondary);
+  background-color: transparent;
+  transition: background-color $dur-fast $ease, color $dur-fast $ease;
+
+  &:hover:not(:disabled) {
+    background-color: var(--nb-hover);
+    color: var(--nb-text);
+  }
+
+  &:active:not(:disabled) {
+    background-color: var(--nb-active);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  &.is-danger:hover:not(:disabled) {
+    background-color: var(--nb-danger-subtle);
+    color: var(--nb-danger);
+  }
+}
+
+// ---------- 页面骨架 ----------
+.nb-page {
+  min-height: 100vh;
+  background-color: var(--nb-bg);
+}
+
+// 主内容区（避开固定头部）
+.nb-page-body {
+  padding-top: $header-height;
+}
+
+// 主内容区（避开底部导航）
+.nb-page-body--with-nav {
+  padding-bottom: $bottom-nav-height;
+}
+
+// ---------- 二级页头（返回 + 标题 + 右侧插槽） ----------
+.nb-page-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: $z-header;
+  height: $header-height;
+  display: flex;
+  align-items: center;
+  padding: 0 $sp-3;
+  background-color: var(--nb-surface);
+  border-bottom: 1px solid var(--nb-border);
+}
+
+.nb-page-header__inner {
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $sp-2;
+
+  &--narrow {
+    max-width: 480px;
+  }
+
+  &--wide {
+    max-width: 900px;
+  }
+}
+
+.nb-page-header__title {
+  flex: 1;
+  text-align: center;
+  font-size: $fs-md;
+  font-weight: $fw-semibold;
+  color: var(--nb-text);
+  @include ellipsis;
+}
+
+.nb-page-header__side {
+  @include flex(row, flex-end, center, $sp-1);
+  min-width: 30px;
+}
+
+// ---------- 卡片 ----------
+.nb-card {
+  @include card($radius-lg);
+  overflow: hidden;
+}
+
+.nb-card--padded {
+  padding: $sp-5;
+}
+
+// ---------- 区块标题 ----------
+.nb-section-title {
+  font-size: $fs-xs;
+  font-weight: $fw-semibold;
+  letter-spacing: 0.04em;
+  color: var(--nb-text-tertiary);
+  text-transform: uppercase;
+}
+
+// ---------- 列表行 ----------
+.nb-row {
+  @include hover-row;
+}
+
+// 分割线
+.nb-divider {
+  height: 1px;
+  background-color: var(--nb-divider);
+  border: none;
+}
+
+// ---------- 状态占位 ----------
+.nb-placeholder {
+  @include flex(column, center, center, $sp-2);
+  padding: $sp-12 $sp-4;
+  color: var(--nb-text-tertiary);
+  text-align: center;
+
+  &__title {
+    font-size: $fs-base;
+    color: var(--nb-text-secondary);
+  }
+
+  &__desc {
+    font-size: $fs-sm;
+    color: var(--nb-text-tertiary);
+  }
+}
+
+// ---------- 提示条 ----------
+.nb-alert {
+  padding: $sp-3 $sp-4;
+  border-radius: $radius-md;
+  font-size: $fs-sm;
+  line-height: $lh-normal;
+
+  &--error {
+    background-color: var(--nb-danger-subtle);
+    color: var(--nb-danger);
+  }
+
+  &--success {
+    background-color: var(--nb-success-subtle);
+    color: var(--nb-success);
+  }
+
+  &--info {
+    background-color: var(--nb-info-subtle);
+    color: var(--nb-info);
+  }
+}
+
+// ---------- 表单 ----------
+.nb-field {
+  display: block;
+  margin-bottom: $sp-4;
+}
+
+.nb-field__label {
+  display: block;
+  margin-bottom: $sp-2;
+  font-size: $fs-sm;
+  font-weight: $fw-medium;
+  color: var(--nb-text-secondary);
+}
+
+.nb-field__hint {
+  margin-top: $sp-1;
+  font-size: $fs-xs;
+  color: var(--nb-text-tertiary);
+}

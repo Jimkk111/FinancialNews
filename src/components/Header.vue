@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Bell, Sun, Moon } from 'lucide-vue-next'
+import { NIcon } from 'naive-ui'
+import { Moon, Sun, User } from 'lucide-vue-next'
 import Avatar from '@/components/Avatar.vue'
 import { useThemeStore } from '@/stores/theme'
 
@@ -25,44 +26,75 @@ const getAvatarUrl = (avatarPath: string | null) => {
 </script>
 
 <template>
-  <header class="fixed top-0 left-0 right-0 z-50 h-14 bg-background border-b border-border flex items-center justify-between px-4">
-    <!-- logo -->
-    <div class="logo flex items-center">
-      <img class="h-9 w-auto" src="@/assets/imgs/logo.png" alt="">
+  <header class="nb-app-header">
+    <div class="nb-app-header__logo">
+      <img class="nb-app-header__logo-img" src="@/assets/imgs/logo.png" alt="财经快讯" />
     </div>
-    <div class="flex items-center">
-      <div class="flex items-center gap-3">
 
-        <!-- 主题切换按钮 -->
-        <button
-          @click="themeStore.toggleTheme()"
-          class="p-1 text-muted-foreground hover:bg-muted rounded-full transition-colors"
-          :title="appliedTheme === 'dark' ? '切换到浅色模式' : '切换到深色模式'"
-        >
-          <Sun v-if="appliedTheme === 'dark'" :size="20" />
-          <Moon v-else :size="20" />
-        </button>
-      </div>
-
-      <!-- <div class="flex items-center">
-        <span class="text-lg font-bold text-brand">财经新闻</span>
-      </div> -->
-
+    <div class="nb-app-header__actions">
       <button
-        type="button"
-        class="w-8 h-8 rounded-full cursor-pointer overflow-hidden bg-gradient-to-br from-orange-400 to-pink-500 border-0 p-0"
-        @click="emit('userClick')"
+        class="nb-icon-btn"
+        :title="appliedTheme === 'dark' ? '切换到浅色模式' : '切换到深色模式'"
+        @click="themeStore.toggleTheme()"
       >
+        <n-icon :component="appliedTheme === 'dark' ? Sun : Moon" :size="17" />
+      </button>
+
+      <button class="nb-app-header__avatar" @click="emit('userClick')">
         <Avatar
           :src="getAvatarUrl(avatar || null) || undefined"
           alt="用户头像"
-          class="w-8 h-8 pointer-events-none"
+          :size="28"
         >
-          <span class="bg-gradient-to-br from-orange-400 to-pink-500 text-white text-xs font-medium pointer-events-none flex items-center justify-center w-full h-full">
-            用户
-          </span>
+          <n-icon :component="User" :size="16" />
         </Avatar>
       </button>
     </div>
   </header>
 </template>
+
+<style scoped lang="scss">
+@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
+.nb-app-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: $z-header;
+  height: $header-height;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 $sp-4;
+  background-color: var(--nb-surface);
+  border-bottom: 1px solid var(--nb-border);
+
+  &__logo {
+    display: flex;
+    align-items: center;
+  }
+
+  &__logo-img {
+    height: 32px;
+    width: auto;
+    display: block;
+  }
+
+  &__actions {
+    @include flex(row, flex-end, center, $sp-1);
+  }
+
+  &__avatar {
+    display: flex;
+    padding: 0;
+    border-radius: $radius-full;
+    transition: opacity $dur-fast $ease;
+
+    &:hover {
+      opacity: 0.8;
+    }
+  }
+}
+</style>

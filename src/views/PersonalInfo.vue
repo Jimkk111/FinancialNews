@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { User, Camera } from 'lucide-vue-next'
+import { NButton, NIcon, NSpin } from 'naive-ui'
+import { ArrowLeft, Camera, User } from 'lucide-vue-next'
 import Avatar from '@/components/Avatar.vue'
 import { uploadAvatar, type AvatarUploadResponse } from '@/services/userService'
 import { useAuthStore } from '@/stores/auth'
@@ -31,7 +32,7 @@ const handleAvatarClick = () => {
 const handleFileChange = async (event: Event) => {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
-  
+
   if (!file) return
 
   const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp']
@@ -77,95 +78,183 @@ const handleLogout = () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-muted pb-20">
-    <div class="bg-card shadow-sm sticky top-0 z-10">
-      <div class="px-4 py-4 flex items-center justify-between">
-        <button
-          @click="handleBack"
-          class="p-2 -ml-2 hover:bg-muted rounded-full transition-colors"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M19 12H5" />
-            <path d="m12 19-7-7 7-7" />
-          </svg>
+  <div class="nb-page">
+    <header class="nb-page-header">
+      <div class="nb-page-header__inner nb-page-header__inner--narrow">
+        <button class="nb-icon-btn" title="返回" @click="handleBack">
+          <n-icon :component="ArrowLeft" :size="18" />
         </button>
-        <h1 class="text-xl font-bold text-foreground">个人信息</h1>
-        <div class="w-8"></div>
+        <span class="nb-page-header__title">个人信息</span>
+        <div class="nb-page-header__side"></div>
       </div>
-    </div>
+    </header>
 
-    <div class="px-4 py-6">
-      <div class="bg-card rounded-lg shadow-sm p-6">
-        <div class="flex flex-col items-center mb-6">
-          <div class="relative">
+    <main class="nb-page-body info">
+      <div class="nb-card nb-card--padded info__card">
+        <div class="info__avatar-block">
+          <div class="info__avatar-wrap">
             <button
-              @click="handleAvatarClick"
+              class="info__avatar-btn"
               :disabled="isUploading"
-              class="w-20 h-20 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow overflow-hidden bg-muted"
+              title="点击更换头像"
+              @click="handleAvatarClick"
             >
-              <Avatar
-                :src="getAvatarUrl(avatar) || undefined"
-                :alt="username"
-                class="w-20 h-20"
-              >
-                <span class="bg-muted flex items-center justify-center w-full h-full">
-                  <User class="text-muted-foreground" :size="40" />
-                </span>
+              <Avatar :src="getAvatarUrl(avatar) || undefined" :alt="username" :size="80">
+                <n-icon :component="User" :size="36" />
               </Avatar>
             </button>
-            <div class="absolute bottom-0 right-0 w-7 h-7 bg-blue-500 rounded-full flex items-center justify-center shadow-md">
-              <Camera class="text-white" :size="14" />
-            </div>
-            <div v-if="isUploading" class="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
-              <div class="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            <span class="info__avatar-badge">
+              <n-icon :component="Camera" :size="13" />
+            </span>
+            <div v-if="isUploading" class="info__avatar-mask">
+              <n-spin size="small" />
             </div>
           </div>
+
           <input
             ref="fileInputRef"
             type="file"
             accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
+            class="info__file-input"
             @change="handleFileChange"
-            class="hidden"
           />
-          <p class="text-xs text-muted-foreground mt-2">点击更换头像</p>
-          <p v-if="error" class="text-xs text-red-500 mt-1">{{ error }}</p>
-          <h2 class="text-xl font-bold text-foreground mt-2">{{ username }}</h2>
+
+          <p class="info__avatar-tip">点击更换头像</p>
+          <p v-if="error" class="info__avatar-error">{{ error }}</p>
+          <h2 class="info__name">{{ username }}</h2>
         </div>
 
-        <div class="space-y-4">
-          <div class="flex justify-between items-center py-3 border-b border-border">
-            <span class="text-muted-foreground">ID</span>
-            <span class="text-foreground font-medium">{{ uid }}</span>
+        <dl class="info__list">
+          <div class="info__item">
+            <dt class="info__item-label">ID</dt>
+            <dd class="info__item-value">{{ uid }}</dd>
           </div>
-          <div class="flex justify-between items-center py-3 border-b border-border">
-            <span class="text-muted-foreground">用户名</span>
-            <span class="text-foreground font-medium">{{ username }}</span>
+          <div class="info__item">
+            <dt class="info__item-label">用户名</dt>
+            <dd class="info__item-value">{{ username }}</dd>
           </div>
-          <div class="flex justify-between items-center py-3 border-b border-border">
-            <span class="text-muted-foreground">邮箱</span>
-            <span class="text-foreground font-medium">{{ email }}</span>
+          <div class="info__item">
+            <dt class="info__item-label">邮箱</dt>
+            <dd class="info__item-value">{{ email }}</dd>
           </div>
-        </div>
+        </dl>
 
-        <div class="mt-8">
-          <button
-            @click="handleLogout"
-            class="w-full py-3 bg-transparent text-red-600 font-medium rounded-xl hover:bg-red-50 dark:hover:bg-red-950 transition-colors border border-red-600"
-          >
+        <div class="info__logout">
+          <n-button block size="large" type="error" secondary @click="handleLogout">
             退出登录
-          </button>
+          </n-button>
         </div>
       </div>
-    </div>
+    </main>
   </div>
 </template>
+
+<style scoped lang="scss">
+@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
+.info {
+  background-color: var(--nb-bg-subtle);
+  min-height: 100vh;
+
+  &__card {
+    max-width: 520px;
+    margin: $sp-6 auto;
+  }
+
+  &__avatar-block {
+    @include flex(column, flex-start, center, $sp-1);
+    padding-bottom: $sp-6;
+    border-bottom: 1px solid var(--nb-divider);
+  }
+
+  &__avatar-wrap {
+    position: relative;
+    width: 80px;
+    height: 80px;
+  }
+
+  &__avatar-btn {
+    display: flex;
+    border-radius: $radius-full;
+    overflow: hidden;
+
+    &:disabled {
+      cursor: progress;
+    }
+  }
+
+  &__avatar-badge {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    @include flex(row, center, center);
+    width: 26px;
+    height: 26px;
+    border-radius: $radius-full;
+    color: #fff;
+    background-color: var(--nb-brand);
+    border: 2px solid var(--nb-surface);
+  }
+
+  &__avatar-mask {
+    position: absolute;
+    inset: 0;
+    @include flex(row, center, center);
+    border-radius: $radius-full;
+    background-color: var(--nb-overlay);
+  }
+
+  &__file-input {
+    display: none;
+  }
+
+  &__avatar-tip {
+    margin-top: $sp-2;
+    font-size: $fs-xs;
+    color: var(--nb-text-tertiary);
+  }
+
+  &__avatar-error {
+    font-size: $fs-xs;
+    color: var(--nb-danger);
+  }
+
+  &__name {
+    margin-top: $sp-2;
+    font-size: $fs-2xl;
+    font-weight: $fw-bold;
+    color: var(--nb-text);
+  }
+
+  &__list {
+    padding: $sp-4 0;
+  }
+
+  &__item {
+    @include flex(row, space-between, center, $sp-4);
+    padding: $sp-3 0;
+    border-bottom: 1px solid var(--nb-divider);
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  &__item-label {
+    font-size: $fs-base;
+    color: var(--nb-text-secondary);
+  }
+
+  &__item-value {
+    font-size: $fs-base;
+    font-weight: $fw-medium;
+    color: var(--nb-text);
+    @include ellipsis;
+  }
+
+  &__logout {
+    padding-top: $sp-2;
+  }
+}
+</style>

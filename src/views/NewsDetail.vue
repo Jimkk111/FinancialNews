@@ -1,17 +1,12 @@
-<!-- 
-  问题1：类型管理混乱，接口定义分布于不同的文件
-  问题2：没有统一管理Axios实例和拦截器
-  问题3：样式平庸
-  问题4：只有一级路由，并且一级路由管理过多路由实例
--->
-
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { NIcon, NPopover, NSpin, NTag, useMessage } from 'naive-ui'
 import {
   ArrowLeft,
   Clock,
   Eye,
+  FileText,
   Heart,
   MoreVertical,
   Share2,
@@ -36,6 +31,7 @@ import type { NewsDetail as NewsType, NewsItem } from '@/types'
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const message = useMessage()
 
 const newsId = ref(Number(route.params.id))
 const uid = authStore.user?.uid || ''
@@ -81,6 +77,7 @@ const toggleFavorite = async () => {
       const response = await removeFavorite(newsId.value)
       if (response.success) {
         isFavorited.value = false
+        message.success('已取消收藏')
       } else {
         console.error('取消收藏失败:', response.error?.message)
       }
@@ -88,6 +85,7 @@ const toggleFavorite = async () => {
       const response = await addFavorite(newsId.value)
       if (response.success) {
         isFavorited.value = true
+        message.success('已加入收藏')
       } else {
         console.error('添加收藏失败:', response.error?.message)
       }
@@ -97,14 +95,6 @@ const toggleFavorite = async () => {
   } finally {
     favoriting.value = false
   }
-}
-
-const toggleMenu = () => {
-  menuOpen.value = !menuOpen.value
-}
-
-const closeMenu = () => {
-  menuOpen.value = false
 }
 
 const handleShare = async () => {
@@ -125,17 +115,19 @@ const handleShare = async () => {
   } else {
     try {
       await navigator.clipboard.writeText(window.location.href)
-      alert('链接已复制')
+      message.success('链接已复制')
     } catch (err) {
       console.error('复制链接失败:', err)
+      message.error('复制链接失败')
     }
   }
 }
 
 const getRelatedNews = (currentNews: NewsType, allNews: NewsItem[]): NewsItem[] => {
-  const sameTags = allNews.filter((n) =>
-    n.id !== currentNews.id &&
-    n.tags?.some((t) => currentNews.tags?.some((ct) => ct.id === t.id))
+  const sameTags = allNews.filter(
+    (n) =>
+      n.id !== currentNews.id &&
+      n.tags?.some((t) => currentNews.tags?.some((ct) => ct.id === t.id))
   )
 
   const sameCategory = allNews.filter(
@@ -165,8 +157,7 @@ const fetchNewsDetail = async () => {
     loading.value = true
     error.value = null
     const res = await getNewsDetail(newsId.value)
-    news.value = res 
-    console.log(res)
+    news.value = res
 
     try {
       await incrementNewsViews(newsId.value)
@@ -176,7 +167,7 @@ const fetchNewsDetail = async () => {
 
     await addNewsHistory()
     await checkFavoritedStatus()
-    
+
     await loadRelatedNews(res)
   } catch (err) {
     error.value = '获取新闻详情失败，请稍后重试'
@@ -186,142 +177,264 @@ const fetchNewsDetail = async () => {
   }
 }
 
-// 处理点击menu图标外部关闭menu
-const handleClickOutside = (event: MouseEvent) => {
-  const target = event.target as HTMLElement
-  if (!target.closest('.menu-container')) {
-    closeMenu()
-  }
-}
-
 watch(() => newsId.value, fetchNewsDetail)
 
 onMounted(() => {
   fetchNewsDetail()
-  document.addEventListener('click', handleClickOutside)
 })
 
 onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside)
+  menuOpen.value = false
 })
+
+const handleRelatedClick = (id: number) => {
+  router.push(`/news/${id}`)
+}
 </script>
 
 <template>
-  <div v-if="loading" class="min-h-screen bg-muted flex items-center justify-center">
-    <div class="text-muted-foreground">加载中...</div>
+  <div v-if="loading" class="detail-loading">
+    <n-spin size="large" />
   </div>
 
-  <div v-else-if="error || !news" class="min-h-screen bg-muted flex items-center justify-center">
-    <div class="text-red-500">{{ error || '新闻不存在' }}</div>
+  <div v-else-if="error || !news" class="detail-loading">
+    <p class="detail-loading__text">{{ error || '新闻不存在' }}</p>
   </div>
 
-  <div v-else class="min-h-screen bg-muted">
-    <header class="fixed top-0 left-0 right-0 z-50 bg-card border-b border-border">
-      <div class="flex items-center justify-between px-4 py-3 max-w-3xl mx-auto">
-        <button
-          @click="router.push('/')"
-          class="p-2 -ml-2 hover:bg-muted rounded-full transition-colors"
-        >
-          <ArrowLeft :size="20" />
+  <div v-else class="nb-page">
+    <header class="nb-page-header">
+      <div class="nb-page-header__inner nb-page-header__inner--wide">
+        <button class="nb-icon-btn" title="返回" @click="router.push('/')">
+          <n-icon :component="ArrowLeft" :size="18" />
         </button>
-        <span class="font-medium text-base">新闻详情</span>
-        <div class="relative menu-container">
-          <button
-            @click="toggleMenu"
-            class="p-2 hover:bg-muted rounded-full transition-colors"
-          >
-            <MoreVertical :size="20" />
-          </button>
+        <span class="nb-page-header__title">新闻详情</span>
 
-          <div
-            v-if="menuOpen"
-            class="absolute right-0 top-full mt-2 w-40 bg-card rounded-lg shadow-lg border border-border py-2 z-50"
-          >
-            <button
-              @click="toggleFavorite(); closeMenu()"
-              class="w-full flex items-center gap-3 px-4 py-2 hover:bg-muted transition-colors"
-              :disabled="!uid || favoriting"
-            >
-              <Heart
-                :size="20"
-                :fill="isFavorited ? 'var(--brand)' : 'none'"
-                :class="isFavorited ? 'text-brand' : 'text-muted-foreground'"
-              />
-              <span :class="isFavorited ? 'text-brand' : 'text-foreground'" class="text-sm">
-                {{ isFavorited ? '已收藏' : '收藏' }}
-              </span>
-            </button>
+        <div class="nb-page-header__side">
+          <n-popover v-model:show="menuOpen" trigger="click" placement="bottom-end" :width="160">
+            <template #trigger>
+              <button class="nb-icon-btn" title="更多">
+                <n-icon :component="MoreVertical" :size="18" />
+              </button>
+            </template>
 
-            <button
-              @click="handleShare; closeMenu()"
-              class="w-full flex items-center gap-3 px-4 py-2 hover:bg-muted transition-colors"
-            >
-              <Share2 :size="20" class="text-muted-foreground" />
-              <span class="text-sm text-foreground">分享</span>
-            </button>
-          </div>
+            <div class="detail-menu">
+              <button
+                class="detail-menu__item"
+                :class="{ 'is-active': isFavorited }"
+                :disabled="!uid || favoriting"
+                @click="toggleFavorite(); menuOpen = false"
+              >
+                <n-icon :component="Heart" :size="16" :class="{ 'is-filled': isFavorited }" />
+                <span>{{ isFavorited ? '已收藏' : '收藏' }}</span>
+              </button>
+
+              <button class="detail-menu__item" @click="handleShare(); menuOpen = false">
+                <n-icon :component="Share2" :size="16" />
+                <span>分享</span>
+              </button>
+            </div>
+          </n-popover>
         </div>
       </div>
     </header>
 
-    <main class="pt-14 max-w-3xl mx-auto">
-      <div class="bg-card px-4 py-5">
-        <h1 class="text-[20px] font-bold text-foreground mb-4 leading-tight">
-          {{ news.title }}
-        </h1>
+    <main class="nb-page-body">
+      <article class="detail">
+        <h1 class="detail__title">{{ news.title }}</h1>
 
-        <div class="flex items-center gap-4 text-xs text-muted-foreground mb-3">
-          <span class="text-brand font-medium">{{ news.source }}</span>
-          <div class="flex items-center gap-1">
-            <Clock :size="12" />
-            <span>{{ formatTime(news.publishTime) }}</span>
-          </div>
-          <div class="flex items-center gap-1">
-            <Eye :size="12" />
-            <span>{{ news.views }} 阅读</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 新闻正文（块级 JSON 渲染，无 v-html） -->
-      <article class="bg-card px-4 py-5 mt-2">
-        <ArticleContent :content="contentBlocks" />
-      </article>
-
-      <!-- 新闻标签 -->
-      <div v-if="news.tags && news.tags.length > 0" class="bg-card px-4 py-4 mt-2">
-        <div class="flex flex-wrap gap-2">
-          <span
-            v-for="tag in news.tags" 
-            :key="tag.id"
-            class="px-3 py-1 bg-muted text-foreground text-sm rounded-full"
-          >
-            #{{ tag.name }}
+        <div class="detail__meta">
+          <span class="detail__source">{{ news.source }}</span>
+          <span class="detail__meta-item">
+            <n-icon :component="Clock" :size="13" />
+            {{ formatTime(news.publishTime) }}
+          </span>
+          <span class="detail__meta-item">
+            <n-icon :component="Eye" :size="13" />
+            {{ news.views }} 阅读
           </span>
         </div>
-      </div>
 
-      <!-- 相关阅读 -->
-      <div v-if="relatedNews.length > 0" class="bg-card px-4 py-4 mt-2">
-        <h3 class="text-base font-semibold text-foreground mb-3">相关阅读</h3>
-        <div class="space-y-3">
-          <div
-            v-for="item in relatedNews"
-            :key="item.id"
-            class="flex items-start gap-3 py-2 border-b border-border last:border-0 cursor-pointer hover:bg-muted -mx-2 px-2 rounded transition-colors"
+        <!-- 新闻正文（块级 JSON 渲染，无 v-html） -->
+        <div class="detail__content">
+          <ArticleContent :content="contentBlocks" />
+        </div>
+
+        <!-- 新闻标签 -->
+        <div v-if="news.tags && news.tags.length > 0" class="detail__tags">
+          <n-tag
+            v-for="tag in news.tags"
+            :key="tag.id"
+            size="small"
+            round
+            :bordered="false"
           >
-            <div class="flex-1 min-w-0">
-              <h4 class="text-sm font-medium text-foreground line-clamp-2 mb-1">
-                {{ item.title }}
-              </h4>
-              <div class="flex items-center gap-2 text-xs text-muted-foreground">
-                <span class="text-brand">{{ item.source }}</span>
+            #{{ tag.name }}
+          </n-tag>
+        </div>
+
+        <!-- 相关阅读 -->
+        <section v-if="relatedNews.length > 0" class="detail__related">
+          <h3 class="detail__related-title">相关阅读</h3>
+          <ul class="detail__related-list">
+            <li
+              v-for="item in relatedNews"
+              :key="item.id"
+              class="detail__related-item"
+              @click="handleRelatedClick(item.id)"
+            >
+              <h4 class="detail__related-name">{{ item.title }}</h4>
+              <div class="detail__related-meta">
+                <span class="detail__source">{{ item.source }}</span>
                 <span>{{ formatTime(item.publishTime) }}</span>
               </div>
-            </div>
-          </div>
-        </div>
-      </div>
+            </li>
+          </ul>
+        </section>
+      </article>
     </main>
   </div>
 </template>
+
+<style scoped lang="scss">
+@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
+.detail-loading {
+  @include flex(column, center, center, $sp-3);
+  min-height: 100vh;
+  background-color: var(--nb-bg-subtle);
+
+  &__text {
+    font-size: $fs-base;
+    color: var(--nb-danger);
+  }
+}
+
+.detail {
+  max-width: $content-max-width;
+  margin: 0 auto;
+  padding: $sp-8 $sp-4 $sp-12;
+  background-color: var(--nb-surface);
+
+  &__title {
+    font-size: 28px;
+    font-weight: $fw-bold;
+    line-height: 1.3;
+    color: var(--nb-text);
+    margin-bottom: $sp-4;
+  }
+
+  &__meta {
+    @include flex(row, flex-start, center, $sp-3);
+    flex-wrap: wrap;
+    padding-bottom: $sp-4;
+    font-size: $fs-xs;
+    color: var(--nb-text-tertiary);
+    border-bottom: 1px solid var(--nb-divider);
+  }
+
+  &__source {
+    color: var(--nb-brand);
+    font-weight: $fw-medium;
+  }
+
+  &__meta-item {
+    @include flex(row, flex-start, center, 4px);
+  }
+
+  &__content {
+    padding-top: $sp-5;
+  }
+
+  &__tags {
+    @include flex(row, flex-start, center, $sp-2);
+    flex-wrap: wrap;
+    margin-top: $sp-6;
+    padding-top: $sp-5;
+    border-top: 1px solid var(--nb-divider);
+  }
+
+  &__related {
+    margin-top: $sp-8;
+    padding-top: $sp-5;
+    border-top: 1px solid var(--nb-divider);
+  }
+
+  &__related-title {
+    font-size: $fs-lg;
+    font-weight: $fw-semibold;
+    color: var(--nb-text);
+    margin-bottom: $sp-3;
+  }
+
+  &__related-list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__related-item {
+    padding: $sp-3 $sp-2;
+    margin: 0 (-$sp-2);
+    border-radius: $radius-md;
+    cursor: pointer;
+    border-bottom: 1px solid var(--nb-divider);
+    transition: background-color $dur-fast $ease;
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    &:hover {
+      background-color: var(--nb-hover);
+    }
+  }
+
+  &__related-name {
+    font-size: $fs-base;
+    font-weight: $fw-medium;
+    line-height: 1.5;
+    color: var(--nb-text);
+    margin-bottom: $sp-1;
+    @include line-clamp(2);
+  }
+
+  &__related-meta {
+    @include flex(row, flex-start, center, $sp-2);
+    font-size: $fs-xs;
+    color: var(--nb-text-tertiary);
+  }
+}
+
+.detail-menu {
+  display: flex;
+  flex-direction: column;
+  padding: $sp-1;
+
+  &__item {
+    @include flex(row, flex-start, center, $sp-2);
+    width: 100%;
+    padding: $sp-2 $sp-3;
+    font-size: $fs-base;
+    color: var(--nb-text);
+    border-radius: $radius-md;
+    transition: background-color $dur-fast $ease;
+
+    &:hover:not(:disabled) {
+      background-color: var(--nb-hover);
+    }
+
+    &:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    &.is-active {
+      color: var(--nb-brand);
+    }
+  }
+}
+
+:deep(.is-filled) {
+  fill: var(--nb-brand);
+}
+</style>

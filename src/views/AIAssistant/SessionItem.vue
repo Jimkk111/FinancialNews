@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { MessageSquare, Pencil, Trash2, MoreVertical } from 'lucide-vue-next'
+import { ref, computed, h, type Component } from 'vue'
+import { NDropdown, NIcon, type DropdownOption } from 'naive-ui'
+import { MessageSquare, MoreVertical, Pencil, Trash2 } from 'lucide-vue-next'
 import type { SessionInfo } from '@/types'
 
 const props = defineProps<{
@@ -14,47 +15,30 @@ const emit = defineEmits<{
   delete: [sessionId: string]
 }>()
 
-const showActions = ref(false)
 const isEditing = ref(false)
 const editTitle = ref('')
 const showMenu = ref(false)
-const menuTriggerRef = ref<HTMLElement | null>(null)
+const menuX = ref(0)
+const menuY = ref(0)
 
 const formattedTime = computed(() => {
   const date = new Date(props.session.updatedAt)
   const now = new Date()
   const isToday = date.toDateString() === now.toDateString()
-  
+
   if (isToday) {
     return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
   }
   return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
 })
 
-const menuPosition = computed(() => {
-  if (!menuTriggerRef.value) {
-    return { top: '0px', left: '0px' }
-  }
-  
-  const rect = menuTriggerRef.value.getBoundingClientRect()
-  const menuWidth = 120
-  const menuHeight = 80
-  
-  let left = rect.right - menuWidth
-  let top = rect.bottom + 4
-  
-  if (left + menuWidth > window.innerWidth) {
-    left = window.innerWidth - menuWidth - 8
-  }
-  if (top + menuHeight > window.innerHeight) {
-    top = rect.top - menuHeight - 4
-  }
-  
-  return {
-    top: `${top}px`,
-    left: `${left}px`
-  }
-})
+const renderIcon = (icon: Component) => () =>
+  h(NIcon, null, { default: () => h(icon) })
+
+const menuOptions: DropdownOption[] = [
+  { label: '重命名', key: 'edit', icon: renderIcon(Pencil) },
+  { label: '删除', key: 'delete', icon: renderIcon(Trash2) },
+]
 
 function handleSelect() {
   if (!isEditing.value) {
@@ -65,7 +49,6 @@ function handleSelect() {
 function startEdit() {
   editTitle.value = props.session.title || '未命名会话'
   isEditing.value = true
-  showMenu.value = false
 }
 
 function saveEdit() {
@@ -79,137 +62,181 @@ function cancelEdit() {
   isEditing.value = false
 }
 
-function handleDelete() {
-  showMenu.value = false
-  emit('delete', props.session.sessionId)
-}
-
-function toggleMenu(e: Event) {
+function toggleMenu(e: MouseEvent) {
   e.stopPropagation()
   showMenu.value = !showMenu.value
+  menuX.value = e.clientX
+  menuY.value = e.clientY
 }
 
 function closeMenu() {
   showMenu.value = false
 }
+
+function handleMenuSelect(key: string) {
+  closeMenu()
+  if (key === 'edit') {
+    startEdit()
+  } else if (key === 'delete') {
+    emit('delete', props.session.sessionId)
+  }
+}
 </script>
 
 <template>
-  <div
-    class="relative overflow-hidden"
-    @touchstart="showActions = false"
-    @touchmove="showActions = true"
-    @touchend="showActions = false"
-  >
+  <div class="session-item">
     <div
-      :class="[
-        'p-3 rounded-lg transition-all duration-150 active:scale-[0.98]',
-        isActive ? 'bg-accent' : 'bg-muted hover:bg-accent'
-      ]"
+      class="session-item__row"
+      :class="{ 'is-active': isActive }"
       @click="handleSelect"
     >
-      <div v-if="isEditing" class="flex items-center gap-2" @click.stop>
+      <div v-if="isEditing" class="session-item__edit" @click.stop>
         <input
           v-model="editTitle"
+          class="session-item__input"
           type="text"
-          class="flex-1 text-sm font-medium text-foreground bg-background border border-border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          @keypress.enter="saveEdit"
-          @keypress.escape="cancelEdit"
           autofocus
+          @keypress.enter="saveEdit"
+          @keydown.esc="cancelEdit"
         />
-        <button
-          @click="saveEdit"
-          class="text-xs text-blue-600 hover:underline px-1"
-        >
-          保存
-        </button>
-        <button
-          @click="cancelEdit"
-          class="text-xs text-muted-foreground hover:underline px-1"
-        >
+        <button class="session-item__link" @click="saveEdit">保存</button>
+        <button class="session-item__link session-item__link--muted" @click="cancelEdit">
           取消
         </button>
       </div>
-      
+
       <template v-else>
-        <div class="flex items-start justify-between gap-2">
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2">
-              <MessageSquare :size="14" class="text-muted-foreground flex-shrink-0" />
-              <h4 class="text-sm font-medium text-foreground truncate">
-                {{ session.title || '未命名会话' }}
-              </h4>
-            </div>
-            <span class="text-xs text-muted-foreground ml-5">
-              {{ formattedTime }}
-            </span>
+        <div class="session-item__body">
+          <div class="session-item__title-row">
+            <n-icon :component="MessageSquare" :size="14" />
+            <h4 class="session-item__title">{{ session.title || '未命名会话' }}</h4>
           </div>
-          
-          <div class="flex items-center gap-1 flex-shrink-0">
-            <button
-              ref="menuTriggerRef"
-              @click="toggleMenu"
-              class="p-1.5 hover:bg-background rounded-full transition-colors"
-            >
-              <MoreVertical :size="16" class="text-muted-foreground" />
-            </button>
-          </div>
+          <span class="session-item__time">{{ formattedTime }}</span>
         </div>
+
+        <button
+          class="session-item__more"
+          title="更多操作"
+          @click.stop="toggleMenu"
+        >
+          <n-icon :component="MoreVertical" :size="15" />
+        </button>
       </template>
     </div>
 
-    <Teleport to="body">
-      <Transition name="menu">
-        <div
-          v-if="showMenu"
-          class="fixed inset-0 z-[100]"
-          @click="closeMenu"
-        >
-          <div
-            class="absolute bg-card border border-border rounded-lg shadow-xl py-1 min-w-[120px]"
-            :style="menuPosition"
-            @click.stop
-          >
-            <button
-              @click="startEdit"
-              class="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-            >
-              <Pencil :size="14" />
-              <span>编辑</span>
-            </button>
-            <button
-              @click="handleDelete"
-              class="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
-            >
-              <Trash2 :size="14" />
-              <span>删除</span>
-            </button>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    <n-dropdown
+      trigger="manual"
+      placement="bottom-start"
+      :x="menuX"
+      :y="menuY"
+      :options="menuOptions"
+      :show="showMenu"
+      @clickoutside="closeMenu"
+      @select="handleMenuSelect"
+    />
   </div>
 </template>
 
-<style scoped>
-.menu-enter-active,
-.menu-leave-active {
-  transition: opacity 0.15s ease;
-}
+<style scoped lang="scss">
+@use '../../styles/variables' as *;
+@use '../../styles/mixins' as *;
 
-.menu-enter-active > div,
-.menu-leave-active > div {
-  transition: transform 0.15s ease, opacity 0.15s ease;
-}
+.session-item {
+  &__row {
+    @include flex(row, space-between, center, $sp-2);
+    padding: $sp-2 $sp-3;
+    border-radius: $radius-md;
+    cursor: pointer;
+    color: var(--nb-text);
+    transition: background-color $dur-fast $ease;
 
-.menu-enter-from,
-.menu-leave-to {
-  opacity: 0;
-}
+    &:hover {
+      background-color: var(--nb-hover);
+    }
 
-.menu-enter-from > div,
-.menu-leave-to > div {
-  transform: scale(0.95);
-  opacity: 0;
+    &.is-active {
+      background-color: var(--nb-brand-subtle);
+    }
+  }
+
+  &__body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__title-row {
+    @include flex(row, flex-start, center, $sp-2);
+    min-width: 0;
+  }
+
+  &__title {
+    font-size: $fs-base;
+    font-weight: $fw-medium;
+    color: var(--nb-text);
+    @include ellipsis;
+  }
+
+  &__time {
+    display: block;
+    margin-top: 2px;
+    margin-left: 22px;
+    font-size: $fs-xs;
+    color: var(--nb-text-tertiary);
+  }
+
+  &__more {
+    @include flex(row, center, center);
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: $radius-md;
+    color: var(--nb-text-tertiary);
+    transition: background-color $dur-fast $ease, color $dur-fast $ease;
+
+    &:hover {
+      background-color: var(--nb-active);
+      color: var(--nb-text);
+    }
+  }
+
+  &__edit {
+    @include flex(row, flex-start, center, $sp-1);
+    width: 100%;
+  }
+
+  &__input {
+    flex: 1;
+    min-width: 0;
+    padding: 3px $sp-2;
+    font-size: $fs-sm;
+    color: var(--nb-text);
+    background-color: var(--nb-bg);
+    border: 1px solid var(--nb-border-strong);
+    border-radius: $radius-sm;
+    outline: none;
+
+    &:focus {
+      border-color: var(--nb-brand);
+    }
+  }
+
+  &__link {
+    flex-shrink: 0;
+    font-size: $fs-xs;
+    color: var(--nb-brand);
+    padding: 0 2px;
+
+    &:hover {
+      text-decoration: underline;
+    }
+
+    &--muted {
+      color: var(--nb-text-tertiary);
+
+      &:hover {
+        color: var(--nb-text-secondary);
+      }
+    }
+  }
 }
 </style>

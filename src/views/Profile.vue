@@ -1,10 +1,19 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ChevronRight, Heart, User, BookOpen, PenSquare, FileText, Send, Globe, X, Loader2 } from 'lucide-vue-next'
+import { NButton, NIcon, NInput, NModal, NSpin } from 'naive-ui'
+import {
+  BookOpen,
+  ChevronRight,
+  FileText,
+  Globe,
+  Heart,
+  PenSquare,
+  Send,
+  User,
+} from 'lucide-vue-next'
 import BottomNav from '@/components/BottomNav.vue'
 import Avatar from '@/components/Avatar.vue'
-import Button from '@/components/ui/Button.vue'
 import { useAuthStore } from '@/stores/auth'
 import { crawlNews } from '@/api/crawler'
 
@@ -79,137 +88,249 @@ const handleCrawl = async () => {
 </script>
 
 <template>
-  <div v-if="username" class="min-h-screen bg-muted pb-16">
-    <div class="bg-card pt-8 pb-6 px-4">
-      <div class="flex items-center gap-4">
+  <div v-if="username" class="nb-page profile">
+    <header class="profile__hero">
+      <div class="profile__hero-inner">
         <button
+          class="profile__avatar-btn"
+          title="进入个人信息"
           @click="router.push('/profile/info')"
-          class="w-20 h-20 rounded-full flex items-center justify-center overflow-hidden bg-muted hover:bg-accent transition-colors"
         >
-          <Avatar
-            :src="getAvatarUrl(avatar) || undefined"
-            :alt="username"
-            class="w-20 h-20"
-          >
-            <span class="bg-muted flex items-center justify-center w-full h-full">
-              <User class="text-muted-foreground" :size="40" />
-            </span>
+          <Avatar :src="getAvatarUrl(avatar) || undefined" :alt="username" :size="72">
+            <n-icon :component="User" :size="32" />
           </Avatar>
         </button>
-        <div class="flex-1">
-          <h2 class="text-xl font-bold text-foreground">{{ username }}</h2>
-          <p class="text-sm text-muted-foreground mt-1">点击头像进入个人信息</p>
+        <div class="profile__identity">
+          <h2 class="profile__name">{{ username }}</h2>
+          <p class="profile__tip">点击头像进入个人信息</p>
         </div>
       </div>
-    </div>
+    </header>
 
-    <div class="px-4 mt-4">
-      <h3 class="text-sm font-semibold text-muted-foreground mb-2 px-2">我的服务</h3>
-      <div class="bg-card">
-        <template v-for="(item, index) in menuItems" :key="index">
-          <button
-            class="w-full flex items-center justify-between px-4 py-4 hover:bg-muted active:bg-accent transition-colors"
-            @click="handleItemClick(item.route)"
-          >
-            <div class="flex items-center gap-3">
-              <component :is="item.icon" :size="22" class="text-muted-foreground" />
-              <span class="text-foreground font-medium">{{ item.label }}</span>
-            </div>
-            <ChevronRight :size="18" class="text-muted-foreground" />
-          </button>
-          <div v-if="index < menuItems.length - 1" class="h-px bg-border mx-4" />
-        </template>
-      </div>
-
-      <h3 class="text-sm font-semibold text-muted-foreground mb-2 mt-6 px-2">工具</h3>
-      <div class="bg-card">
+    <main class="profile__body">
+      <h3 class="nb-section-title profile__group-title">我的服务</h3>
+      <div class="nb-card profile__group">
         <button
-          class="w-full flex items-center justify-between px-4 py-4 hover:bg-muted active:bg-accent transition-colors"
-          @click="openCrawlDialog"
+          v-for="(item, index) in menuItems"
+          :key="item.route"
+          class="profile__row"
+          @click="handleItemClick(item.route)"
         >
-          <div class="flex items-center gap-3">
-            <Globe :size="22" class="text-muted-foreground" />
-            <span class="text-foreground font-medium">爬取新闻</span>
-          </div>
-          <ChevronRight :size="18" class="text-muted-foreground" />
+          <span class="profile__row-left">
+            <n-icon :component="item.icon" :size="20" />
+            <span class="profile__row-label">{{ item.label }}</span>
+          </span>
+          <n-icon :component="ChevronRight" :size="18" />
+          <span v-if="index < menuItems.length - 1" class="profile__row-divider" />
         </button>
       </div>
 
-      <div class="text-center text-muted-foreground text-xs mt-6 mb-4">
+      <h3 class="nb-section-title profile__group-title">工具</h3>
+      <div class="nb-card profile__group">
+        <button class="profile__row" @click="openCrawlDialog">
+          <span class="profile__row-left">
+            <n-icon :component="Globe" :size="20" />
+            <span class="profile__row-label">爬取新闻</span>
+          </span>
+          <n-icon :component="ChevronRight" :size="18" />
+        </button>
+      </div>
+
+      <div class="profile__version">
         <p>财经快讯 v1.0.0</p>
       </div>
-    </div>
+    </main>
 
-    <!-- 爬取新闻弹窗 -->
-    <Teleport to="body">
-      <Transition name="fade">
-        <div
-          v-if="showCrawlDialog"
-          class="fixed inset-0 z-50 flex items-center justify-center p-4"
-        >
-          <div class="absolute inset-0 bg-black/50" @click="closeCrawlDialog" />
-          <div class="relative bg-card rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-            <div class="flex items-center justify-between px-5 py-4 border-b border-border">
-              <h3 class="text-lg font-semibold text-foreground">爬取新闻</h3>
-              <button
-                @click="closeCrawlDialog"
-                class="p-1 rounded-md hover:bg-muted transition-colors"
-              >
-                <X :size="20" class="text-muted-foreground" />
-              </button>
-            </div>
-
-            <div class="p-5 space-y-4">
-              <div>
-                <label class="block text-sm font-medium text-foreground mb-2">
-                  输入爬取指令
-                </label>
-                <textarea
-                  v-model="crawlInstruction"
-                  placeholder="例如：帮我爬取财联社的最新财经新闻"
-                  rows="3"
-                  class="w-full px-3 py-2 bg-muted border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-                  @keydown.ctrl.enter="handleCrawl"
-                />
-                <p class="text-xs text-muted-foreground mt-1">按 Ctrl+Enter 快速发送</p>
-              </div>
-
-              <Button
-                variant="default"
-                class="w-full"
-                :disabled="!crawlInstruction.trim() || crawlLoading"
-                @click="handleCrawl"
-              >
-                <Loader2 v-if="crawlLoading" :size="16" class="mr-2 animate-spin" />
-                {{ crawlLoading ? '爬取中...' : '开始爬取' }}
-              </Button>
-
-              <div v-if="crawlResult" class="bg-muted rounded-lg p-4">
-                <p class="text-sm font-medium text-foreground mb-2">执行结果</p>
-                <p class="text-sm text-muted-foreground whitespace-pre-wrap">{{ crawlResult }}</p>
-              </div>
-
-              <div v-if="crawlError" class="bg-destructive/10 rounded-lg p-4">
-                <p class="text-sm text-destructive">{{ crawlError }}</p>
-              </div>
-            </div>
-          </div>
+    <n-modal
+      v-model:show="showCrawlDialog"
+      preset="card"
+      title="爬取新闻"
+      size="huge"
+      :bordered="false"
+      style="max-width: 520px"
+    >
+      <div class="crawl">
+        <div class="nb-field">
+          <label class="nb-field__label" for="crawl-instruction">输入爬取指令</label>
+          <n-input
+            id="crawl-instruction"
+            v-model:value="crawlInstruction"
+            type="textarea"
+            :rows="3"
+            placeholder="例如：帮我爬取财联社的最新财经新闻"
+            @keydown.ctrl.enter="handleCrawl"
+          />
+          <p class="nb-field__hint">按 Ctrl+Enter 快速发送</p>
         </div>
-      </Transition>
-    </Teleport>
+
+        <n-button
+          type="primary"
+          block
+          :disabled="!crawlInstruction.trim() || crawlLoading"
+          :loading="crawlLoading"
+          @click="handleCrawl"
+        >
+          开始爬取
+        </n-button>
+
+        <div v-if="crawlLoading" class="crawl__loading">
+          <n-spin size="small" />
+          <span>正在爬取，请稍候...</span>
+        </div>
+
+        <div v-if="crawlResult" class="crawl__result">
+          <p class="crawl__result-title">执行结果</p>
+          <p class="crawl__result-text">{{ crawlResult }}</p>
+        </div>
+
+        <p v-if="crawlError" class="nb-alert nb-alert--error">{{ crawlError }}</p>
+      </div>
+    </n-modal>
 
     <BottomNav active-tab="profile" @tab-change="handleTabChange" />
   </div>
 </template>
 
-<style scoped>
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
+<style scoped lang="scss">
+@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
+.profile {
+  background-color: var(--nb-bg-subtle);
+  min-height: 100vh;
+  padding-bottom: $bottom-nav-height;
+
+  &__hero {
+    background-color: var(--nb-surface);
+    border-bottom: 1px solid var(--nb-border);
+  }
+
+  &__hero-inner {
+    max-width: 640px;
+    margin: 0 auto;
+    @include flex(row, flex-start, center, $sp-4);
+    padding: $sp-8 $sp-4 $sp-6;
+  }
+
+  &__avatar-btn {
+    display: flex;
+    border-radius: $radius-full;
+    transition: opacity $dur-fast $ease;
+
+    &:hover {
+      opacity: 0.85;
+    }
+  }
+
+  &__identity {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__name {
+    font-size: $fs-2xl;
+    font-weight: $fw-bold;
+    color: var(--nb-text);
+  }
+
+  &__tip {
+    margin-top: $sp-1;
+    font-size: $fs-sm;
+    color: var(--nb-text-secondary);
+  }
+
+  &__body {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: $sp-6 $sp-4;
+  }
+
+  &__group-title {
+    margin: 0 0 $sp-2 $sp-2;
+
+    & + .profile__group {
+      margin-bottom: $sp-6;
+    }
+  }
+
+  &__group {
+    background-color: var(--nb-surface);
+  }
+
+  &__row {
+    position: relative;
+    @include flex(row, space-between, center);
+    width: 100%;
+    padding: $sp-4;
+    color: var(--nb-text-tertiary);
+    transition: background-color $dur-fast $ease;
+
+    &:hover {
+      background-color: var(--nb-hover);
+    }
+
+    &:active {
+      background-color: var(--nb-active);
+    }
+  }
+
+  &__row-left {
+    @include flex(row, flex-start, center, $sp-3);
+    min-width: 0;
+  }
+
+  &__row-label {
+    font-size: $fs-base;
+    font-weight: $fw-medium;
+    color: var(--nb-text);
+  }
+
+  &__row-divider {
+    position: absolute;
+    left: $sp-4;
+    right: $sp-4;
+    bottom: 0;
+    height: 1px;
+    background-color: var(--nb-divider);
+  }
+
+  &__version {
+    padding: $sp-6 0 $sp-4;
+    text-align: center;
+    font-size: $fs-xs;
+    color: var(--nb-text-tertiary);
+  }
 }
 
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
+.crawl {
+  display: flex;
+  flex-direction: column;
+  gap: $sp-4;
+
+  &__loading {
+    @include flex(row, center, center, $sp-2);
+    font-size: $fs-sm;
+    color: var(--nb-text-secondary);
+  }
+
+  &__result {
+    padding: $sp-4;
+    background-color: var(--nb-surface-subtle);
+    border-radius: $radius-md;
+  }
+
+  &__result-title {
+    font-size: $fs-sm;
+    font-weight: $fw-medium;
+    color: var(--nb-text);
+    margin-bottom: $sp-2;
+  }
+
+  &__result-text {
+    font-size: $fs-sm;
+    color: var(--nb-text-secondary);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
 }
 </style>

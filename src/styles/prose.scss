@@ -1,0 +1,185 @@
+@use 'variables' as *;
+
+// ============================================================
+// 正文排版 —— .news-prose 作用域，编辑端与展示端共用
+// 颜色全部走主题 token，随 .dark 自动切换
+// ============================================================
+
+.news-prose {
+  font-size: 16px;
+  line-height: 1.75;
+  color: var(--nb-text);
+  word-break: break-word;
+}
+
+// 段落
+.news-prose p {
+  margin-bottom: 1.4em;
+}
+
+.news-prose p:last-child {
+  margin-bottom: 0;
+}
+
+// 标题
+.news-prose h1,
+.news-prose h2,
+.news-prose h3,
+.news-prose h4 {
+  color: var(--nb-text);
+  font-weight: $fw-semibold;
+  line-height: 1.4;
+}
+
+.news-prose h1 {
+  font-size: 1.6rem;
+  margin: 1.8em 0 0.8em;
+}
+
+.news-prose h2 {
+  font-size: 1.3rem;
+  margin: 1.6em 0 0.7em;
+}
+
+.news-prose h3 {
+  font-size: 1.1rem;
+  margin: 1.4em 0 0.6em;
+}
+
+.news-prose h4 {
+  font-size: 1rem;
+  margin: 1.2em 0 0.5em;
+}
+
+// 文本样式
+.news-prose strong {
+  font-weight: $fw-semibold;
+}
+
+.news-prose em {
+  font-style: italic;
+}
+
+// 列表
+.news-prose ul,
+.news-prose ol {
+  margin: 0.8em 0;
+  padding-left: 1.6em;
+}
+
+.news-prose ul {
+  list-style-type: disc;
+}
+
+.news-prose ol {
+  list-style-type: decimal;
+}
+
+.news-prose li {
+  margin-bottom: 0.4em;
+}
+
+// 编辑器里列表项内部包裹 p，需取消其过大间距
+.news-prose li p {
+  margin-bottom: 0.2em;
+}
+
+// 引用
+.news-prose blockquote {
+  border-left: 3px solid var(--nb-border-strong);
+  padding-left: 1em;
+  margin: 1em 0;
+  color: var(--nb-text-secondary);
+}
+
+.news-prose blockquote p {
+  margin-bottom: 0.4em;
+}
+
+.news-prose blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+// 代码
+.news-prose code {
+  background-color: var(--nb-code-bg);
+  border-radius: $radius-sm;
+  padding: 0.15em 0.35em;
+  font-family: $nb-font-mono;
+  font-size: 0.875em;
+  color: var(--nb-brand);
+}
+
+.news-prose pre {
+  background-color: var(--nb-pre-bg);
+  color: var(--nb-text);
+  border: 1px solid var(--nb-border);
+  border-radius: $radius-md;
+  padding: 0.9em 1.1em;
+  margin: 1.2em 0;
+  overflow-x: auto;
+  font-family: $nb-font-mono;
+  font-size: 0.875em;
+  line-height: 1.6;
+}
+
+.news-prose pre code {
+  background-color: transparent;
+  padding: 0;
+  color: inherit;
+  font-size: 1em;
+}
+
+// 分割线
+.news-prose hr {
+  border: none;
+  border-top: 1px solid var(--nb-divider);
+  margin: 1.6em 0;
+}
+
+// 图片
+.news-prose figure {
+  margin: 1.4em 0;
+}
+
+.news-prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: $radius-md;
+  display: block;
+}
+
+.news-prose figcaption {
+  font-size: 0.85rem;
+  color: var(--nb-text-tertiary);
+  text-align: center;
+  margin-top: 0.5em;
+}
+
+// 链接
+.news-prose a {
+  color: var(--nb-brand);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.news-prose a:hover {
+  opacity: 0.8;
+}
+
+// 视频
+.news-prose video {
+  max-width: 100%;
+  height: auto;
+  border-radius: $radius-md;
+  display: block;
+}
+
+// TipTap 占位符（仅编辑态生效）
+.news-prose p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--nb-text-tertiary);
+  pointer-events: none;
+  height: 0;
+}

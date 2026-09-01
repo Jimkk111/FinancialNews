@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Eye, EyeOff } from 'lucide-vue-next'
+import { NButton, NIcon, NInput } from 'naive-ui'
+import { ArrowLeft, Eye, EyeOff } from 'lucide-vue-next'
 import { login, type LoginRequest } from '@/services/userService'
 import { useAuthStore } from '@/stores/auth'
 
@@ -44,9 +45,7 @@ const handleSubmit = async (e: Event) => {
     const response = await login(loginRequest)
 
     if (response.success && response.data) {
-
       authStore.login(response.data.user)
-
       router.push('/')
     } else {
       error.value = response.error?.message || '登录失败，请检查用户名和密码'
@@ -59,7 +58,6 @@ const handleSubmit = async (e: Event) => {
   }
 }
 
-
 // 路由跳转，返回
 // 应该返回到登录前的页面，而不是固定返回首页
 const handleBack = () => {
@@ -68,114 +66,158 @@ const handleBack = () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-muted flex flex-col">
-    <header class="fixed top-0 left-0 right-0 z-50 bg-card border-b border-border px-4 py-3">
-      <div class="flex items-center justify-between max-w-md mx-auto">
-        <button
-          @click="handleBack"
-          class="w-8 h-8 flex items-center justify-center text-muted-foreground hover:bg-muted rounded-full transition-colors"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M19 12H5" />
-            <path d="m12 19-7-7 7-7" />
-          </svg>
+  <div class="nb-page auth">
+    <header class="nb-page-header">
+      <div class="nb-page-header__inner nb-page-header__inner--narrow">
+        <button class="nb-icon-btn" title="返回" @click="handleBack">
+          <n-icon :component="ArrowLeft" :size="18" />
         </button>
-
-        <h1 class="text-lg font-semibold text-foreground">登录</h1>
-
-        <div class="w-8"></div>
+        <span class="nb-page-header__title">登录</span>
+        <div class="nb-page-header__side"></div>
       </div>
     </header>
 
-    <main class="flex-1 pt-20 pb-6 px-4 overflow-y-auto">
-      <div class="max-w-md mx-auto">
-        <div class="text-center mb-8">
-          <h1 class="text-2xl font-bold text-foreground mb-2">欢迎回来</h1>
-          <p class="text-muted-foreground text-sm">登录您的账号，继续精彩体验</p>
+    <main class="auth__main">
+      <div class="auth__card">
+        <div class="auth__head">
+          <h1 class="auth__title">欢迎回来</h1>
+          <p class="auth__subtitle">登录您的账号，继续精彩体验</p>
         </div>
 
-        <div class="bg-card rounded-2xl shadow-sm p-6 mb-4">
-          <form @submit="handleSubmit" class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-foreground mb-2">
-                用户名或邮箱
-              </label>
-              <input
-                type="text"
-                v-model="username"
-                placeholder="请输入用户名或邮箱"
-                class="w-full px-4 py-3 bg-muted border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-base"
-              />
-            </div>
+        <form class="auth__form" @submit="handleSubmit">
+          <div class="nb-field">
+            <label class="nb-field__label" for="login-username">用户名或邮箱</label>
+            <n-input
+              id="login-username"
+              v-model:value="username"
+              size="large"
+              placeholder="请输入用户名或邮箱"
+              :input-props="{ autocomplete: 'username' }"
+            />
+          </div>
 
-            <div>
-              <label class="block text-sm font-medium text-foreground mb-2">
-                密码
-              </label>
-              <div class="relative">
-                <input
-                  :type="showPassword ? 'text' : 'password'"
-                  v-model="password"
-                  placeholder="请输入密码"
-                  class="w-full px-4 py-3 bg-muted border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-base"
-                />
+          <div class="nb-field">
+            <label class="nb-field__label" for="login-password">密码</label>
+            <n-input
+              id="login-password"
+              v-model:value="password"
+              size="large"
+              :type="showPassword ? 'text' : 'password'"
+              placeholder="请输入密码"
+              :input-props="{ autocomplete: 'current-password' }"
+              @keyup.enter="handleSubmit"
+            >
+              <template #suffix>
                 <button
                   type="button"
+                  class="auth__eye"
+                  :title="showPassword ? '隐藏密码' : '显示密码'"
                   @click="showPassword = !showPassword"
-                  class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  <EyeOff v-if="showPassword" :size="20" />
-                  <Eye v-else :size="20" />
+                  <n-icon :component="showPassword ? EyeOff : Eye" :size="18" />
                 </button>
-              </div>
-            </div>
+              </template>
+            </n-input>
+          </div>
 
-            <div v-if="error" class="bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 text-sm px-4 py-2 rounded-lg">
-              {{ error }}
-            </div>
+          <p v-if="error" class="nb-alert nb-alert--error">{{ error }}</p>
 
-            <div class="flex items-center justify-end">
-              <button
-                type="button"
-                @click="router.push('/forgot-password')"
-                class="text-sm text-blue-600 hover:text-blue-700 font-medium"
-              >
-                忘记密码？
-              </button>
-            </div>
+          <div class="auth__row-end">
+            <n-button quaternary size="small" type="primary" @click="router.push('/forgot-password')">
+              忘记密码？
+            </n-button>
+          </div>
 
-            <button
-              type="submit"
-              :disabled="loading"
-              class="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium rounded-xl hover:shadow-lg transform hover:scale-[1.02] transition-all disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {{ loading ? '登录中...' : '登录' }}
-            </button>
-          </form>
-        </div>
-
-        <div class="text-center">
-          <span class="text-muted-foreground text-sm">还没有账号？</span>
-          <button
-            type="button"
-            @click="router.push('/register')"
-            class="text-blue-600 hover:text-blue-700 font-medium text-sm ml-1"
+          <n-button
+            type="primary"
+            size="large"
+            block
+            attr-type="submit"
+            :loading="loading"
+            :disabled="loading"
           >
-            立即注册
-          </button>
-        </div>
-
+            {{ loading ? '登录中...' : '登录' }}
+          </n-button>
+        </form>
       </div>
+
+      <p class="auth__footer">
+        <span class="auth__footer-text">还没有账号？</span>
+        <n-button quaternary size="small" type="primary" @click="router.push('/register')">
+          立即注册
+        </n-button>
+      </p>
     </main>
   </div>
 </template>
+
+<style scoped lang="scss">
+@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
+.auth {
+  background-color: var(--nb-bg-subtle);
+
+  &__main {
+    min-height: 100vh;
+    padding: calc(#{$header-height} + #{$sp-8}) $sp-4 $sp-8;
+    @include flex(column, flex-start, center, 0);
+  }
+
+  &__card {
+    width: 100%;
+    max-width: 400px;
+    padding: $sp-8;
+    background-color: var(--nb-surface);
+    border: 1px solid var(--nb-border);
+    border-radius: $radius-lg;
+    box-shadow: var(--nb-shadow-sm);
+  }
+
+  &__head {
+    text-align: center;
+    margin-bottom: $sp-6;
+  }
+
+  &__title {
+    font-size: $fs-3xl;
+    font-weight: $fw-bold;
+    color: var(--nb-text);
+    margin-bottom: $sp-2;
+  }
+
+  &__subtitle {
+    font-size: $fs-sm;
+    color: var(--nb-text-secondary);
+  }
+
+  &__form {
+    display: block;
+  }
+
+  &__eye {
+    @include flex(row, center, center);
+    color: var(--nb-text-tertiary);
+    transition: color $dur-fast $ease;
+
+    &:hover {
+      color: var(--nb-text);
+    }
+  }
+
+  &__row-end {
+    @include flex(row, flex-end, center);
+    margin-bottom: $sp-4;
+  }
+
+  &__footer {
+    @include flex(row, center, center, $sp-1);
+    margin-top: $sp-4;
+  }
+
+  &__footer-text {
+    font-size: $fs-sm;
+    color: var(--nb-text-secondary);
+  }
+}
+</style>

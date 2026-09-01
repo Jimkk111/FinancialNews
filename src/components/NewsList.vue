@@ -2,6 +2,8 @@
 import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { DynamicScroller, DynamicScrollerItem } from 'vue-virtual-scroller'
 import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
+import { NEmpty, NSpin, NIcon } from 'naive-ui'
+import { FileText } from 'lucide-vue-next'
 import { getNewsList } from '@/services/newsService'
 import { formatTime } from '@/utils/format'
 import NewsItem from './NewsItem.vue'
@@ -76,17 +78,19 @@ const fetchNews = async () => {
   }
 }
 
-watch(() => props.categoryId, () => {
-  page.value = 1
-  newsData.value = []
-  hasMore.value = true
-  fetchNews()
-  nextTick(() => setupObserver())
-})
+watch(
+  () => props.categoryId,
+  () => {
+    page.value = 1
+    newsData.value = []
+    hasMore.value = true
+    fetchNews()
+    nextTick(() => setupObserver())
+  }
+)
 
-
-/* 
-  observer的作用是监听是否到达了页面底部，动态增加页数从而加载数据。
+/*
+  observer 的作用是监听是否到达了页面底部，动态增加页数从而加载数据。
 */
 watch(page, (newPage) => {
   if (newPage > 1) {
@@ -107,7 +111,7 @@ const setupObserver = () => {
     },
     {
       threshold: 0.1,
-      rootMargin: '0px 0px 200px 0px'
+      rootMargin: '0px 0px 200px 0px',
     }
   )
 
@@ -130,24 +134,34 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="pb-20">
-    <div v-if="loading && newsData.length === 0" class="py-8 text-center text-muted-foreground">
-      加载中...
+  <div class="nb-news-list">
+    <div v-if="loading && newsData.length === 0" class="nb-news-list__state">
+      <n-spin size="medium" />
+      <span class="nb-news-list__state-text">加载中...</span>
     </div>
 
-    <div v-else-if="error && newsData.length === 0" class="py-8 text-center text-red-500">
-      {{ error }}
+    <div v-else-if="error && newsData.length === 0" class="nb-news-list__state">
+      <n-empty description="获取新闻列表失败，请稍后重试">
+        <template #icon>
+          <n-icon :component="FileText" />
+        </template>
+      </n-empty>
     </div>
 
-    <div v-else-if="newsData.length === 0" class="text-center py-10">
-      <p class="text-muted-foreground">该分类暂无新闻</p>
-      <p class="text-muted-foreground/70 text-sm mt-2">请尝试选择其他分类</p>
+    <div v-else-if="newsData.length === 0" class="nb-news-list__state">
+      <n-empty description="该分类暂无新闻">
+        <template #icon>
+          <n-icon :component="FileText" />
+        </template>
+        <template #extra>
+          <span class="nb-news-list__hint">请尝试选择其他分类</span>
+        </template>
+      </n-empty>
     </div>
 
-
-<!-- 虚拟列表容器
-     作用是只渲染可视区域内的DOM结点，而不是渲染全部列表项。
--->
+    <!--
+      虚拟列表容器：只渲染可视区域内的 DOM 节点，而不是渲染全部列表项。
+    -->
     <DynamicScroller
       v-else
       :items="newsData"
@@ -174,14 +188,55 @@ onUnmounted(() => {
       </template>
     </DynamicScroller>
 
-    <div v-if="loadingMore" class="text-center py-4 text-muted-foreground text-sm">
-      加载更多新闻...
+    <div v-if="loadingMore" class="nb-news-list__more">
+      <n-spin size="small" />
+      <span>加载更多新闻...</span>
     </div>
 
-    <div v-if="hasMore" ref="observerRef" class="h-1"></div>
+    <div v-if="hasMore" ref="observerRef" class="nb-news-list__sentinel"></div>
 
-    <div v-if="!hasMore && newsData.length > 0" class="text-center py-4 text-muted-foreground/70 text-sm">
+    <div v-if="!hasMore && newsData.length > 0" class="nb-news-list__end">
       已加载全部新闻
     </div>
   </div>
 </template>
+
+<style scoped lang="scss">
+@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
+.nb-news-list {
+  &__state {
+    @include flex(column, center, center, $sp-3);
+    padding: $sp-12 $sp-4;
+    color: var(--nb-text-tertiary);
+  }
+
+  &__state-text {
+    font-size: $fs-sm;
+  }
+
+  &__hint {
+    font-size: $fs-sm;
+    color: var(--nb-text-tertiary);
+  }
+
+  &__more {
+    @include flex(row, center, center, $sp-2);
+    padding: $sp-4;
+    font-size: $fs-sm;
+    color: var(--nb-text-tertiary);
+  }
+
+  &__sentinel {
+    height: 1px;
+  }
+
+  &__end {
+    padding: $sp-4;
+    text-align: center;
+    font-size: $fs-sm;
+    color: var(--nb-text-tertiary);
+  }
+}
+</style>

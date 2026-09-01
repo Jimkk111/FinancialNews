@@ -19,7 +19,6 @@ const handleSearch = (keyword: string) => {
   router.push({ name: 'searchResults', query: { q: keyword } })
 }
 
-
 // 点击用户头像的跳转需要鉴权
 const handleUserClick = () => {
   if (!authStore.isAuthenticated) {
@@ -41,12 +40,13 @@ const handleTabChange = (tab: string) => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-background">
+  <div class="nb-page">
     <Header :avatar="authStore.user?.avatar || null" @user-click="handleUserClick" />
 
-    <main class="pt-14 pb-16">
-      <div class="pt-4"></div>
-      <SearchBar @search="handleSearch" />
+    <main class="nb-page-body nb-page-body--with-nav">
+      <div class="home__search">
+        <SearchBar @search="handleSearch" />
+      </div>
       <CategoryTabs @category-change="selectedCategoryId = $event" />
       <NewsList :category-id="selectedCategoryId" @news-click="handleNewsClick" />
     </main>
@@ -54,3 +54,13 @@ const handleTabChange = (tab: string) => {
     <BottomNav active-tab="home" @tab-change="handleTabChange" />
   </div>
 </template>
+
+<style scoped lang="scss">
+@use '../styles/variables' as *;
+
+.home {
+  &__search {
+    padding: $sp-4 $sp-4 $sp-3;
+  }
+}
+</style>

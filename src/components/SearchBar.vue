@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { NIcon } from 'naive-ui'
 import { Search } from 'lucide-vue-next'
 
 const keyword = ref('')
@@ -22,16 +23,54 @@ const handleKeyPress = (e: KeyboardEvent) => {
 </script>
 
 <template>
-  <div class="w-full px-4 pb-3">
-    <div class="relative">
-      <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" :size="18" />
-      <input
-        type="text"
-        placeholder=""
-        v-model="keyword"
-        @keypress="handleKeyPress"
-        class="w-full pl-10 pr-4 py-2.5 bg-muted rounded-lg text-sm focus:outline-none focus:bg-accent transition-colors"
-      />
-    </div>
+  <div class="nb-search">
+    <n-icon class="nb-search__icon" :component="Search" :size="16" />
+    <input
+      v-model="keyword"
+      type="text"
+      class="nb-search__input"
+      placeholder="搜索新闻、主题或关键词"
+      @keypress="handleKeyPress"
+    />
   </div>
 </template>
+
+<style scoped lang="scss">
+@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
+.nb-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  &__icon {
+    position: absolute;
+    left: $sp-3;
+    color: var(--nb-text-tertiary);
+    pointer-events: none;
+  }
+
+  &__input {
+    width: 100%;
+    height: 36px;
+    padding: 0 $sp-3 0 34px;
+    font-size: $fs-base;
+    color: var(--nb-text);
+    background-color: var(--nb-surface-subtle);
+    border: 1px solid transparent;
+    border-radius: $radius-md;
+    transition: background-color $dur-base $ease, border-color $dur-base $ease;
+
+    &::placeholder {
+      color: var(--nb-text-tertiary);
+    }
+
+    &:focus {
+      outline: none;
+      background-color: var(--nb-surface);
+      border-color: var(--nb-border-strong);
+    }
+  }
+}
+</style>
