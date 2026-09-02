@@ -321,7 +321,7 @@ const handleVideoUpload = async (event: Event) => {
       </template>
 
       <span class="tiptap-editor__status">
-        <n-spin v-if="isUploadingImage || isUploadingVideo" size="tiny" />
+        <n-spin v-if="isUploadingImage || isUploadingVideo" />
       </span>
     </div>
 
