@@ -26,6 +26,15 @@ const emit = defineEmits<{
   newsClick: [id: number]
 }>()
 
+// 桌面端检测：≥1024px 时使用多列网格渲染（虚拟滚动仅用于移动端单列）
+const isDesktop = ref(false)
+const desktopQuery = window.matchMedia('(min-width: 1024px)')
+const updateIsDesktop = () => {
+  isDesktop.value = desktopQuery.matches
+}
+updateIsDesktop()
+desktopQuery.addEventListener('change', updateIsDesktop)
+
 const newsData = ref<LocalNewsItem[]>([])
 const loading = ref(true)
 const loadingMore = ref(false)
@@ -127,6 +136,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  desktopQuery.removeEventListener('change', updateIsDesktop)
   if (observer) {
     observer.disconnect()
   }
@@ -160,7 +170,24 @@ onUnmounted(() => {
     </div>
 
     <!--
-      虚拟列表容器：只渲染可视区域内的 DOM 节点，而不是渲染全部列表项。
+      桌面端（≥1024px）：多列卡片网格，不使用虚拟滚动
+    -->
+    <div v-else-if="isDesktop" class="nb-news-list__grid">
+      <NewsItem
+        v-for="item in newsData"
+        :key="item.id"
+        :id="item.id"
+        :title="item.title"
+        :source="item.source"
+        :time="item.time"
+        :views="item.views"
+        class="nb-news-list__grid-item"
+        @click="emit('newsClick', $event)"
+      />
+    </div>
+
+    <!--
+      移动端：虚拟列表容器，只渲染可视区域内的 DOM 节点，而不是渲染全部列表项。
     -->
     <DynamicScroller
       v-else
@@ -206,6 +233,29 @@ onUnmounted(() => {
 @use '../styles/mixins' as *;
 
 .nb-news-list {
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: $sp-4;
+
+    @include respond-to('lg') {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  &__grid-item {
+    // 网格内把列表项渲染成卡片
+    background-color: var(--nb-surface);
+    border: 1px solid var(--nb-border);
+    border-radius: $radius-lg;
+    margin-bottom: 0;
+    border-bottom: 1px solid var(--nb-border);
+
+    &:hover {
+      background-color: var(--nb-hover);
+    }
+  }
+
   &__state {
     @include flex(column, center, center, $sp-3);
     padding: $sp-12 $sp-4;

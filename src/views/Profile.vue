@@ -13,6 +13,7 @@ import {
   User,
 } from 'lucide-vue-next'
 import BottomNav from '@/components/BottomNav.vue'
+import Header from '@/components/Header.vue'
 import Avatar from '@/components/Avatar.vue'
 import { useAuthStore } from '@/stores/auth'
 import { crawlNews } from '@/api/crawler'
@@ -107,6 +108,15 @@ const handleCrawl = async () => {
       </div>
     </header>
 
+    <!-- 桌面端顶部导航 -->
+    <Header
+      :avatar="authStore.user?.avatar || null"
+      :active-nav="'profile'"
+      hide-on-mobile
+      @user-click="() => router.push('/profile/info')"
+      @nav-click="handleTabChange"
+    />
+
     <main class="profile__body">
       <h3 class="nb-section-title profile__group-title">我的服务</h3>
       <div class="nb-card profile__group">
@@ -200,9 +210,19 @@ const handleCrawl = async () => {
   min-height: 100vh;
   padding-bottom: $bottom-nav-height;
 
+  // 桌面端：底部导航隐藏，去掉预留
+  @include respond-to('md') {
+    padding-bottom: 0;
+  }
+
   &__hero {
     background-color: var(--nb-surface);
     border-bottom: 1px solid var(--nb-border);
+
+    // 桌面端给 fixed 顶栏让位
+    @include respond-to('md') {
+      padding-top: $header-height;
+    }
   }
 
   &__hero-inner {
@@ -210,6 +230,11 @@ const handleCrawl = async () => {
     margin: 0 auto;
     @include flex(row, flex-start, center, $sp-4);
     padding: $sp-8 $sp-4 $sp-6;
+
+    @include respond-to('md') {
+      max-width: 900px;
+      padding-top: $sp-10;
+    }
   }
 
   &__avatar-btn {
@@ -243,6 +268,10 @@ const handleCrawl = async () => {
     max-width: 640px;
     margin: 0 auto;
     padding: $sp-6 $sp-4;
+
+    @include respond-to('md') {
+      max-width: 900px;
+    }
   }
 
   &__group-title {
