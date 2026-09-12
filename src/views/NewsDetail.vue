@@ -316,11 +316,6 @@ const handleRelatedClick = (id: number) => {
   padding: $sp-8 $sp-4 $sp-12;
   background-color: var(--nb-surface);
 
-  // 桌面端适度加宽，相关阅读分两列
-  @include respond-to('md') {
-    max-width: 860px;
-  }
-
   &__title {
     font-size: 28px;
     font-weight: $fw-bold;
@@ -375,13 +370,6 @@ const handleRelatedClick = (id: number) => {
   &__related-list {
     display: flex;
     flex-direction: column;
-
-    // 桌面端两列网格
-    @include respond-to('md') {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: $sp-2;
-    }
   }
 
   &__related-item {

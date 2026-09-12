@@ -72,11 +72,6 @@ onMounted(fetchCategories)
     padding: $sp-2 $sp-4;
     overflow-x: auto;
     @include hide-scrollbar;
-
-    // 桌面端由 nb-page-body 提供侧边距
-    @include respond-to('md') {
-      padding: $sp-2 0;
-    }
   }
 
   &__item {

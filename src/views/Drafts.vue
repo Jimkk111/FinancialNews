@@ -131,10 +131,6 @@ onMounted(() => {
     display: flex;
     flex-direction: column;
     gap: $sp-3;
-
-    @include respond-to('md') {
-      max-width: 720px;
-    }
   }
 
   &__card {

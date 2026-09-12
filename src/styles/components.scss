@@ -45,29 +45,11 @@
 // 主内容区（避开固定头部）
 .nb-page-body {
   padding-top: $header-height;
-
-  // 桌面端内容区限宽居中，避免全宽拉伸
-  @include respond-to('md') {
-    padding-top: calc(#{$header-height} + #{$sp-4});
-    width: 100%;
-    max-width: 1200px;
-    margin: 0 auto;
-    padding-left: $sp-6;
-    padding-right: $sp-6;
-  }
-
-  @include respond-to('lg') {
-    max-width: 1280px;
-  }
 }
 
-// 主内容区（避开底部导航）—— 仅移动端需要预留底部导航高度
+// 主内容区（避开底部导航）
 .nb-page-body--with-nav {
   padding-bottom: $bottom-nav-height;
-
-  @include respond-to('md') {
-    padding-bottom: $sp-12;
-  }
 }
 
 // ---------- 二级页头（返回 + 标题 + 右侧插槽） ----------
@@ -95,18 +77,10 @@
 
   &--narrow {
     max-width: 480px;
-
-    @include respond-to('md') {
-      max-width: 640px;
-    }
   }
 
   &--wide {
     max-width: 900px;
-
-    @include respond-to('lg') {
-      max-width: 1100px;
-    }
   }
 }
 
