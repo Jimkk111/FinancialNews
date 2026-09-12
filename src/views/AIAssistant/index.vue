@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { NDrawer, NDrawerContent, NIcon, NSpin } from 'naive-ui'
 import { MessageSquare, Plus } from 'lucide-vue-next'
@@ -15,7 +15,7 @@ const store = useAiSessionStore()
 const sidebarOpen = computed({
   get: () => store.sidebarOpen,
   set: (value) => {
-    if (value) store.toggleSidebar()
+    if (value) store.openSidebar()
     else store.closeSidebar()
   },
 })
@@ -33,8 +33,19 @@ function handleNewConversation() {
   store.createNewSession()
 }
 
+const HEALTH_CHECK_INTERVAL = 30_000
+let healthTimer: ReturnType<typeof setInterval> | undefined
+
 onMounted(() => {
-  store.init()
+  void store.init()
+  // 持续探测服务可用性，宕机/恢复都能及时反映到输入框状态
+  healthTimer = setInterval(() => {
+    void store.checkHealth()
+  }, HEALTH_CHECK_INTERVAL)
+})
+
+onUnmounted(() => {
+  if (healthTimer !== undefined) clearInterval(healthTimer)
 })
 </script>
 
@@ -73,6 +84,7 @@ onMounted(() => {
         :is-sending="store.isSending"
         :is-loading="store.isLoading"
         @send="handleSend"
+        @stop="store.stopGeneration"
       />
     </div>
 

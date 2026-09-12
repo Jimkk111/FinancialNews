@@ -1,23 +1,21 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { NIcon } from 'naive-ui'
-import { Copy, RefreshCw, Sparkles } from 'lucide-vue-next'
-import { marked } from 'marked'
-import type { Message } from '@/stores/aiSession'
+import { Check, Copy, RefreshCw, Sparkles } from 'lucide-vue-next'
+import { renderMarkdown } from '@/utils/markdown'
+import type { Message } from '@/types'
 
 const props = defineProps<{
   message: Message
+  /** 仅最后一条 AI 回复允许重新生成 */
+  canRegenerate?: boolean
 }>()
 
 const emit = defineEmits<{
   regenerate: []
 }>()
 
-const displayContent = ref('')
-
-const renderedContent = computed(() => {
-  return marked(displayContent.value) as string
-})
+const renderedContent = computed(() => renderMarkdown(props.message.content))
 
 const formattedTime = computed(() => {
   return props.message.timestamp.toLocaleTimeString('zh-CN', {
@@ -29,36 +27,33 @@ const formattedTime = computed(() => {
 const isUser = computed(() => props.message.role === 'user')
 const isStreaming = computed(() => props.message.status === 'streaming')
 
-// 更新显示内容（流式时直接展示，流式本身就是渐进效果）
-function updateDisplay() {
-  displayContent.value = props.message.content
-}
+const copied = ref(false)
+let copiedTimer: ReturnType<typeof setTimeout> | undefined
 
-watch(
-  () => props.message.content,
-  () => {
-    updateDisplay()
-  }
-)
-
-watch(
-  () => props.message.status,
-  () => {
-    updateDisplay()
-  }
-)
-
-onMounted(() => {
-  updateDisplay()
-})
-
-// https、localhost环境才能使用navigator.clipboard
+// navigator.clipboard 仅在 https/localhost 可用，非安全上下文降级到 execCommand
 async function copyContent() {
+  const text = props.message.content
   try {
-    await navigator.clipboard.writeText(props.message.content)
+    await navigator.clipboard.writeText(text)
   } catch {
-    // 复制失败静默处理
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.select()
+    try {
+      document.execCommand('copy')
+    } finally {
+      textarea.remove()
+    }
   }
+
+  copied.value = true
+  if (copiedTimer) clearTimeout(copiedTimer)
+  copiedTimer = setTimeout(() => {
+    copied.value = false
+  }, 1500)
 }
 
 function handleRegenerate() {
@@ -76,7 +71,7 @@ function handleRegenerate() {
       <div v-if="!isUser" class="bubble__name">AI 助手</div>
 
       <div class="bubble__content">
-        <!-- AI 回复由 marked 渲染，内容来自后端模型输出 -->
+        <!-- AI 回复经 renderMarkdown 消毒后渲染，防注入 -->
         <div
           v-if="!isUser"
           class="nb-markdown"
@@ -91,10 +86,15 @@ function handleRegenerate() {
         <span class="bubble__time">{{ formattedTime }}</span>
 
         <template v-if="!isUser && !isStreaming">
-          <button class="bubble__action" title="复制" @click="copyContent">
-            <n-icon :component="Copy" :size="13" />
+          <button class="bubble__action" :title="copied ? '已复制' : '复制'" @click="copyContent">
+            <n-icon :component="copied ? Check : Copy" :size="13" />
           </button>
-          <button class="bubble__action" title="重新生成" @click="handleRegenerate">
+          <button
+            v-if="canRegenerate"
+            class="bubble__action"
+            title="重新生成"
+            @click="handleRegenerate"
+          >
             <n-icon :component="RefreshCw" :size="13" />
           </button>
         </template>

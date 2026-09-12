@@ -1,13 +1,12 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, onMounted } from 'vue'
+import { ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { NIcon } from 'naive-ui'
 import { Sparkles } from 'lucide-vue-next'
 import { useAiSessionStore } from '@/stores/aiSession'
 import MessageBubble from './MessageBubble.vue'
 
 const store = useAiSessionStore()
-const messagesEndRef = ref<HTMLDivElement | null>(null)
-const scrollContainerRef = ref<HTMLDivElement | null>(null)
+const scrollContainerRef = ref<HTMLElement | null>(null)
 
 const quickQuestions = [
   '今日A股行情如何？',
@@ -16,39 +15,61 @@ const quickQuestions = [
   '新手如何理财？',
 ]
 
-// 自动滚动到底部
-function scrollToBottom() {
-  nextTick(() => {
-    messagesEndRef.value?.scrollIntoView({ behavior: 'smooth' })
-  })
+// 仅当用户停留在底部附近时才自动跟随滚动，避免阅读历史内容时被强行拽回
+const isNearBottom = ref(true)
+let scrollRaf = 0
+
+function scrollToBottom(instant = false) {
+  const el = scrollContainerRef.value
+  if (!el) return
+  if (instant) {
+    el.scrollTop = el.scrollHeight
+  } else {
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  }
+}
+
+function handleScroll() {
+  const el = scrollContainerRef.value
+  if (!el) return
+  isNearBottom.value = el.scrollHeight - el.scrollTop - el.clientHeight < 80
 }
 
 watch(
   () => store.messages.length,
-  () => scrollToBottom()
+  () => {
+    if (isNearBottom.value) scrollToBottom()
+  }
 )
 
+// 流式期间高频更新：rAF 合帧 + 即时滚动，避免 smooth 动画堆积卡顿
 watch(
   () => store.messages[store.messages.length - 1]?.content,
-  () => scrollToBottom()
+  () => {
+    if (!isNearBottom.value || scrollRaf) return
+    scrollRaf = requestAnimationFrame(() => {
+      scrollRaf = 0
+      scrollToBottom(true)
+    })
+  }
+)
+
+// 切换会话后强制回到底部
+watch(
+  () => store.currentSessionId,
+  () => {
+    isNearBottom.value = true
+    nextTick(() => scrollToBottom(true))
+  }
 )
 
 onMounted(() => {
-  scrollToBottom()
+  scrollToBottom(true)
 })
 
-function handleRegenerate() {
-  const lastUserMessage = [...store.messages].reverse().find((m) => m.role === 'user')
-
-  if (lastUserMessage) {
-    store.messages = store.messages.filter((m) => m.id !== lastUserMessage.id)
-    const lastAiMessage = store.messages[store.messages.length - 1]
-    if (lastAiMessage && lastAiMessage.role === 'assistant') {
-      store.messages = store.messages.slice(0, -1)
-    }
-    store.sendMessage(lastUserMessage.content)
-  }
-}
+onBeforeUnmount(() => {
+  if (scrollRaf) cancelAnimationFrame(scrollRaf)
+})
 
 function handleQuickQuestion(question: string) {
   store.sendMessage(question)
@@ -56,7 +77,7 @@ function handleQuickQuestion(question: string) {
 </script>
 
 <template>
-  <div ref="scrollContainerRef" class="chat">
+  <div ref="scrollContainerRef" class="chat" @scroll.passive="handleScroll">
     <div class="chat__inner">
       <p v-if="store.error" class="nb-alert nb-alert--error chat__error">
         {{ store.error }}
@@ -64,14 +85,14 @@ function handleQuickQuestion(question: string) {
 
       <div v-if="store.hasMessages" class="chat__messages">
         <MessageBubble
-          v-for="message in store.messages"
+          v-for="(message, index) in store.messages"
           :key="message.id"
           :message="message"
-          @regenerate="handleRegenerate"
+          :can-regenerate="index === store.messages.length - 1 && message.role === 'assistant'"
+          @regenerate="store.regenerate()"
         />
       </div>
 
-      <!-- 会话加载时应该隐藏 -->
       <div v-else class="chat__welcome">
         <div class="chat__welcome-icon">
           <n-icon :component="Sparkles" :size="24" />
@@ -91,9 +112,6 @@ function handleQuickQuestion(question: string) {
           </button>
         </div>
       </div>
-
-      <!-- 哨兵元素 -->
-      <div ref="messagesEndRef" />
     </div>
   </div>
 </template>

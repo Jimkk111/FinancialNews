@@ -1,28 +1,33 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import type { SessionInfo, ChatMessage } from '@/types'
+import type { ChatMessage, Message, SessionInfo } from '@/types'
+import { ApiError } from '@/api/request'
 import {
   createSession,
   getSessions,
   getSessionMessages,
   deleteSession,
   updateSessionTitle,
-  chatCompletion,
+  startStreamingChat,
   healthCheck
 } from '@/services/aiService'
-
-export interface Message {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  timestamp: Date
-  status?: 'streaming' | 'complete' | 'error'
-}
 
 export interface SessionGroup {
   label: string
   key: string
   sessions: SessionInfo[]
+}
+
+const CONVERSATIONS_CACHE_KEY = 'aiAssistantConversations'
+const LAST_SESSION_KEY = 'aiAssistantLastSessionId'
+
+// 流式 chunk 按 50ms 批量刷入消息，避免每个 token 都触发响应式更新与 Markdown 重渲染
+const CHUNK_FLUSH_INTERVAL = 50
+
+function createMessageId(): string {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `m-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 }
 
 export const useAiSessionStore = defineStore('aiSession', () => {
@@ -35,6 +40,11 @@ export const useAiSessionStore = defineStore('aiSession', () => {
   const searchQuery = ref('')
   const sidebarOpen = ref(false)
   const isServiceHealthy = ref<boolean | null>(null)
+
+  // 进行中的流式请求句柄与代数：切换/新建/删除会话时通过递增代数
+  // 使回调失效并中止连接，避免旧流写入新会话的消息列表
+  let activeStream: { abort: () => void } | null = null
+  let streamEpoch = 0
 
   const currentSession = computed(() =>
     sessions.value.find(s => s.sessionId === currentSessionId.value)
@@ -62,9 +72,7 @@ export const useAiSessionStore = defineStore('aiSession', () => {
       { label: '更早', key: 'older', sessions: [] }
     ]
 
-    const filtered = filteredSessions.value
-
-    filtered.forEach(session => {
+    filteredSessions.value.forEach(session => {
       const date = new Date(session.updatedAt)
       if (date >= today) {
         groups[0]!.sessions.push(session)
@@ -84,70 +92,59 @@ export const useAiSessionStore = defineStore('aiSession', () => {
 
   async function checkHealth(): Promise<boolean> {
     try {
-      const healthy = await healthCheck()
-      isServiceHealthy.value = healthy
-      return healthy
+      await healthCheck()
+      isServiceHealthy.value = true
+      return true
     } catch {
       isServiceHealthy.value = false
       return false
     }
   }
 
-  function normalizeSession(s: any): SessionInfo {
-    return {
-      sessionId: s.sessionId || s.session_id || s.id || '',
-      title: s.title || '未命名会话',
-      createdAt: s.createdAt || s.created_at || new Date().toISOString(),
-      updatedAt: s.updatedAt || s.updated_at || new Date().toISOString()
-    }
-  }
-
   async function loadSessions() {
     try {
-      const data = await getSessions() as any
-      const rawSessions = Array.isArray(data) ? data : (data?.sessions || data?.data || [])
-      sessions.value = rawSessions
-        .map(normalizeSession)
-        .sort((a: SessionInfo, b: SessionInfo) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-
-      localStorage.setItem('aiAssistantConversations', JSON.stringify(
-        sessions.value.map(s => ({
-          sessionId: s.sessionId,
-          title: s.title,
-          updatedAt: s.updatedAt
-        }))
-      ))
+      const data = await getSessions()
+      sessions.value = [...data].sort(
+        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      )
+      localStorage.setItem(CONVERSATIONS_CACHE_KEY, JSON.stringify(sessions.value))
     } catch {
-      const cachedConversations = localStorage.getItem('aiAssistantConversations')
-      if (cachedConversations) {
-        try {
-          const parsed = JSON.parse(cachedConversations)
-          sessions.value = parsed.map(normalizeSession)
-        } catch {
-          sessions.value = []
-        }
+      // 请求失败时若已有列表则保留，仅在空列表时回退到本地缓存
+      if (sessions.value.length > 0) return
+      try {
+        const cached = localStorage.getItem(CONVERSATIONS_CACHE_KEY)
+        if (cached) sessions.value = JSON.parse(cached) as SessionInfo[]
+      } catch {
+        sessions.value = []
       }
     }
   }
 
+  function abortActiveStream() {
+    if (!activeStream) return
+    streamEpoch++
+    activeStream.abort()
+    activeStream = null
+  }
+
   function createNewSession() {
-    if (isSending.value) return
+    abortActiveStream()
     currentSessionId.value = null
     messages.value = []
     error.value = null
-    localStorage.removeItem('aiAssistantLastSessionId')
+    localStorage.removeItem(LAST_SESSION_KEY)
   }
 
   async function selectSession(sessionId: string) {
+    abortActiveStream()
+
     try {
       isLoading.value = true
       error.value = null
 
-      const rawMessages = await getSessionMessages(sessionId) as any
-      const sessionMessages: ChatMessage[] = Array.isArray(rawMessages)
-        ? rawMessages
-        : (rawMessages?.messages || rawMessages?.data || [])
+      const sessionMessages = await getSessionMessages(sessionId)
 
+      // 后端暂未返回消息时间戳，历史消息统一使用加载时刻
       const formattedMessages: Message[] = sessionMessages.map((msg, index) => ({
         id: `${sessionId}-${index}`,
         role: msg.role,
@@ -160,7 +157,7 @@ export const useAiSessionStore = defineStore('aiSession', () => {
       messages.value = formattedMessages
       sidebarOpen.value = false
 
-      localStorage.setItem('aiAssistantLastSessionId', sessionId)
+      localStorage.setItem(LAST_SESSION_KEY, sessionId)
     } catch (e) {
       console.error('selectSession failed:', e)
       error.value = '加载会话失败，请重试'
@@ -170,20 +167,20 @@ export const useAiSessionStore = defineStore('aiSession', () => {
   }
 
   async function removeSession(sessionId: string): Promise<boolean> {
+    if (sessionId === currentSessionId.value) {
+      abortActiveStream()
+    }
     try {
-      const success = await deleteSession(sessionId)
-      if (success) {
-        await loadSessions()
+      await deleteSession(sessionId)
+      await loadSessions()
 
-        if (sessionId === currentSessionId.value) {
-          currentSessionId.value = null
-          messages.value = []
-          localStorage.removeItem('aiAssistantLastSessionId')
-        }
-
-        return true
+      if (sessionId === currentSessionId.value) {
+        currentSessionId.value = null
+        messages.value = []
+        localStorage.removeItem(LAST_SESSION_KEY)
       }
-      return false
+
+      return true
     } catch {
       error.value = '删除会话失败，请重试'
       return false
@@ -192,25 +189,24 @@ export const useAiSessionStore = defineStore('aiSession', () => {
 
   async function renameSession(sessionId: string, title: string): Promise<boolean> {
     try {
-      const success = await updateSessionTitle(sessionId, title)
-      if (success) {
-        await loadSessions()
-        return true
-      }
-      return false
+      await updateSessionTitle(sessionId, title)
+      await loadSessions()
+      return true
     } catch {
       error.value = '修改会话标题失败，请重试'
       return false
     }
   }
 
+  /** 发送消息并流式接收回复。失败时保留用户消息便于重试 */
   async function sendMessage(content: string) {
-    if (!content.trim() || isSending.value) return
+    const trimmed = content.trim()
+    if (!trimmed || isSending.value) return
 
     const userMessage: Message = {
-      id: `user-${Date.now()}`,
+      id: createMessageId(),
       role: 'user',
-      content: content.trim(),
+      content: trimmed,
       timestamp: new Date(),
       status: 'complete'
     }
@@ -219,25 +215,40 @@ export const useAiSessionStore = defineStore('aiSession', () => {
     isSending.value = true
     error.value = null
 
+    const epoch = ++streamEpoch
     let sessionIdValue = currentSessionId.value
-    const aiMessageId = `ai-${Date.now()}`
-    let currentContent = ''
+    const aiMessageId = createMessageId()
     let hasCreatedMessage = false
+    let currentContent = ''
+    let flushTimer: ReturnType<typeof setTimeout> | null = null
+
+    const flushContent = () => {
+      flushTimer = null
+      if (epoch !== streamEpoch) return
+      // 原地修改已有对象属性，确保 Vue Proxy 能精确追踪变更并触发响应式更新
+      const aiMsg = messages.value.find(m => m.id === aiMessageId)
+      if (aiMsg) aiMsg.content = currentContent
+    }
+
+    function removeMessage(id: string) {
+      messages.value = messages.value.filter(m => m.id !== id)
+    }
 
     try {
       // 唯一的会话创建入口：发消息时才创建会话
       if (!sessionIdValue) {
         isLoading.value = true
         const newSessionId = await createSession()
+        if (epoch !== streamEpoch) return
         if (!newSessionId) {
           error.value = '创建会话失败，请重试'
-          messages.value = messages.value.filter(m => m.id !== userMessage.id)
+          removeMessage(userMessage.id)
           return
         }
         sessionIdValue = newSessionId
         currentSessionId.value = newSessionId
-        localStorage.setItem('aiAssistantLastSessionId', newSessionId)
-        await loadSessions()
+        localStorage.setItem(LAST_SESSION_KEY, newSessionId)
+        void loadSessions()
         isLoading.value = false
       }
 
@@ -248,11 +259,11 @@ export const useAiSessionStore = defineStore('aiSession', () => {
           content: msg.content
         }))
 
-      const response = await chatCompletion(
+      const { promise, abort } = startStreamingChat(
         chatMessages,
         sessionIdValue,
-        true,
         (chunk) => {
+          if (epoch !== streamEpoch) return
           currentContent += chunk
 
           if (!hasCreatedMessage) {
@@ -264,63 +275,100 @@ export const useAiSessionStore = defineStore('aiSession', () => {
               status: 'streaming'
             }]
             hasCreatedMessage = true
-          } else {
-            // 原地修改已有对象属性，确保 Vue Proxy 能精确追踪变更并触发响应式更新
-            const aiMsg = messages.value.find(msg => msg.id === aiMessageId)
-            if (aiMsg) {
-              aiMsg.content = currentContent
-            }
+            return
+          }
+          if (flushTimer === null) {
+            flushTimer = setTimeout(flushContent, CHUNK_FLUSH_INTERVAL)
           }
         }
       )
+      activeStream = { abort }
 
-      if (response.sessionId && response.sessionId !== currentSessionId.value) {
-        currentSessionId.value = response.sessionId
-        localStorage.setItem('aiAssistantLastSessionId', response.sessionId)
+      const result = await promise
+
+      // 会话已切换/重置：丢弃本次流的结果，避免写入新会话的消息列表
+      if (epoch !== streamEpoch) return
+
+      if (flushTimer !== null) {
+        clearTimeout(flushTimer)
+        flushTimer = null
       }
 
-      if (hasCreatedMessage) {
-        // 原地修改，避免替换整个数组导致依赖追踪失效
-        const aiMsg = messages.value.find(msg => msg.id === aiMessageId)
-        if (aiMsg) {
-          aiMsg.content = response.content || 'AI暂无回应'
-          aiMsg.status = 'complete'
-        }
+      if (result.sessionId && result.sessionId !== currentSessionId.value) {
+        currentSessionId.value = result.sessionId
+        localStorage.setItem(LAST_SESSION_KEY, result.sessionId)
+      }
+
+      const aiMsg = messages.value.find(m => m.id === aiMessageId)
+      if (result.aborted && !result.content) {
+        // 未收到任何内容即停止：移除占位消息
+        if (aiMsg) removeMessage(aiMessageId)
+      } else if (aiMsg) {
+        // 原地修改已有对象属性，确保 Vue Proxy 能精确追踪变更并触发响应式更新
+        aiMsg.content = result.content || 'AI暂无回应'
+        aiMsg.status = 'complete'
       } else {
         messages.value = [...messages.value, {
           id: aiMessageId,
           role: 'assistant',
-          content: response.content || 'AI暂无回应',
+          content: result.content || 'AI暂无回应',
           timestamp: new Date(),
           status: 'complete'
         }]
       }
 
       await loadSessions()
-    } catch {
-      messages.value = messages.value.filter(m => m.id !== userMessage.id && m.id !== aiMessageId)
-      error.value = '发送消息失败，请重试'
+    } catch (e) {
+      if (flushTimer !== null) clearTimeout(flushTimer)
+      if (epoch !== streamEpoch) return
+
+      // 保留用户消息与已收到的部分回复便于重试，仅移除空的占位消息
+      const aiMsg = messages.value.find(m => m.id === aiMessageId)
+      if (aiMsg && !aiMsg.content) {
+        removeMessage(aiMessageId)
+      } else if (aiMsg) {
+        aiMsg.status = 'complete'
+      }
+      error.value = e instanceof ApiError && e.message
+        ? e.message
+        : '发送消息失败，请重试'
     } finally {
+      if (epoch === streamEpoch) {
+        activeStream = null
+      }
       isSending.value = false
       isLoading.value = false
     }
   }
 
-  function clearMessages() {
-    messages.value = []
+  /** 停止生成：中止进行中的流，已收到的部分回复会被保留 */
+  function stopGeneration() {
+    activeStream?.abort()
+  }
+
+  /** 重新生成：移除最后一轮问答后重发 */
+  function regenerate(): Promise<void> {
+    if (isSending.value) return Promise.resolve()
+    for (let i = messages.value.length - 1; i >= 0; i--) {
+      if (messages.value[i]!.role === 'user') {
+        const content = messages.value[i]!.content
+        messages.value = messages.value.slice(0, i)
+        return sendMessage(content)
+      }
+    }
+    return Promise.resolve()
   }
 
   function clearError() {
     error.value = null
   }
 
-  function resetSending() {
-    isSending.value = false
-    isLoading.value = false
-  }
-
   function toggleSidebar() {
     sidebarOpen.value = !sidebarOpen.value
+  }
+
+  function openSidebar() {
+    sidebarOpen.value = true
   }
 
   function closeSidebar() {
@@ -333,14 +381,15 @@ export const useAiSessionStore = defineStore('aiSession', () => {
 
   async function init() {
     const healthy = await checkHealth()
+    // 健康检查失败也尝试渲染列表（服务端不可达时回退本地缓存）
+    await loadSessions()
+
     if (!healthy) {
       error.value = '后端服务不可用，请检查服务是否运行'
       return
     }
 
-    await loadSessions()
-
-    let targetSessionId = localStorage.getItem('aiAssistantLastSessionId')
+    let targetSessionId = localStorage.getItem(LAST_SESSION_KEY)
 
     // 过滤掉旧代码可能写入的无效值
     if (!targetSessionId || targetSessionId === 'undefined' || targetSessionId === 'null') {
@@ -350,7 +399,7 @@ export const useAiSessionStore = defineStore('aiSession', () => {
     if (!targetSessionId && sessions.value.length > 0) {
       targetSessionId = sessions.value[0]!.sessionId
       if (targetSessionId) {
-        localStorage.setItem('aiAssistantLastSessionId', targetSessionId)
+        localStorage.setItem(LAST_SESSION_KEY, targetSessionId)
       }
     }
 
@@ -361,7 +410,7 @@ export const useAiSessionStore = defineStore('aiSession', () => {
         console.error('selectSession failed:', e)
         currentSessionId.value = null
         messages.value = []
-        localStorage.removeItem('aiAssistantLastSessionId')
+        localStorage.removeItem(LAST_SESSION_KEY)
       }
     }
   }
@@ -387,10 +436,11 @@ export const useAiSessionStore = defineStore('aiSession', () => {
     removeSession,
     renameSession,
     sendMessage,
-    clearMessages,
+    stopGeneration,
+    regenerate,
     clearError,
-    resetSending,
     toggleSidebar,
+    openSidebar,
     closeSidebar,
     setSearchQuery,
     init

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { NIcon, NSpin } from 'naive-ui'
-import { Send } from 'lucide-vue-next'
+import { Send, Square } from 'lucide-vue-next'
 
 const props = defineProps<{
   disabled: boolean
@@ -11,6 +11,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   send: [content: string]
+  stop: []
 }>()
 
 const inputValue = ref('')
@@ -27,11 +28,13 @@ function adjustHeight() {
 
 watch(inputValue, adjustHeight)
 
-const canSend = () =>
-  inputValue.value.trim() && !props.disabled && !props.isSending && !props.isLoading
+const canSend = computed(
+  () =>
+    inputValue.value.trim() !== '' && !props.disabled && !props.isSending && !props.isLoading
+)
 
 function handleSend() {
-  if (!canSend()) return
+  if (!canSend.value) return
   emit('send', inputValue.value)
   inputValue.value = ''
   nextTick(() => {
@@ -42,6 +45,8 @@ function handleSend() {
 }
 
 function handleKeydown(e: KeyboardEvent) {
+  // 输入法组合期间（如拼音候选确认）的回车不触发发送
+  if (e.isComposing || e.keyCode === 229) return
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
     handleSend()
@@ -64,13 +69,22 @@ function handleKeydown(e: KeyboardEvent) {
         />
 
         <button
+          v-if="isSending"
+          class="composer__send is-stop"
+          title="停止生成"
+          @click="emit('stop')"
+        >
+          <n-icon :component="Square" :size="12" />
+        </button>
+        <button
+          v-else
           class="composer__send"
-          :class="{ 'is-ready': canSend() }"
+          :class="{ 'is-ready': canSend }"
           title="发送"
-          :disabled="!canSend()"
+          :disabled="!canSend"
           @click="handleSend"
         >
-          <n-spin v-if="isSending" size="small" />
+          <n-spin v-if="isLoading" size="small" />
           <n-icon v-else :component="Send" :size="17" />
         </button>
       </div>
@@ -150,6 +164,16 @@ function handleKeydown(e: KeyboardEvent) {
 
       &:hover {
         background-color: var(--nb-brand-hover);
+      }
+    }
+
+    &.is-stop {
+      color: #fff;
+      background-color: var(--nb-brand);
+
+      &:hover {
+        background-color: var(--nb-brand-hover);
+        opacity: 0.9;
       }
     }
 
