@@ -52,6 +52,7 @@ onMounted(() => {
   updateDisplay()
 })
 
+// https、localhost环境才能使用navigator.clipboard
 async function copyContent() {
   try {
     await navigator.clipboard.writeText(props.message.content)

@@ -1,4 +1,4 @@
-import type { ArticleContent, Block, Inline, InlineMark } from '@/types/content'
+import type { ArticleContent, Block, Inline, InlineMark, ListItem } from '@/types/content'
 import { normalizeContent } from './validateContent'
 
 /**
@@ -55,12 +55,14 @@ function parseInline(container: Node, marks: InlineMark[] = []): Inline[] {
   return out
 }
 
-function parseListItems(list: Element): { children: Inline[] }[] {
-  const items: { children: Inline[] }[] = []
-  list.querySelectorAll(':scope > li').forEach((li) => {
+function parseListItems(list: Element): ListItem[] {
+  const items: ListItem[] = []
+  // 遍历直接子元素而非 ':scope > li' 选择器，避免依赖选择器引擎对 :scope 的支持
+  for (const child of Array.from(list.children)) {
+    if (child.tagName.toLowerCase() !== 'li') continue
     // v1：扁平化，li 内文本统一提取（嵌套列表文本并入，不展开层级）
-    items.push({ children: parseInline(li) })
-  })
+    items.push({ children: parseInline(child) })
+  }
   return items
 }
 
@@ -112,8 +114,18 @@ function parseSingleBlock(el: Element): Block | Block[] | null {
     }
     case 'br':
       return { type: 'paragraph', children: [{ type: 'hardBreak' }] }
+    case 'figure': {
+      // <figure><img><figcaption> → image + caption（与 blocksToHtml 的导出格式对称）
+      const img = el.querySelector('img')
+      if (!img) return parseBlockElement(el)
+      return {
+        type: 'image',
+        src: img.getAttribute('src') ?? '',
+        alt: img.getAttribute('alt') ?? undefined,
+        caption: el.querySelector('figcaption')?.textContent?.trim() || undefined,
+      }
+    }
     case 'div':
-    case 'figure':
     case 'article':
     case 'section':
     case 'main':

@@ -10,7 +10,7 @@ import { sanitizeUrl } from './sanitizeUrl'
  */
 function normalizeMark(raw: unknown): InlineMark | null {
   if (!raw || typeof raw !== 'object') return null
-  const mark = raw as { type?: unknown; href?: unknown }
+  const mark = raw as { type?: unknown; href?: unknown; attrs?: { href?: unknown } }
 
   switch (mark.type) {
     case 'bold':
@@ -18,7 +18,9 @@ function normalizeMark(raw: unknown): InlineMark | null {
     case 'code':
       return { type: mark.type }
     case 'link': {
-      const href = sanitizeUrl(typeof mark.href === 'string' ? mark.href : undefined)
+      // href 兼容两种来源：扁平契约 { type, href } 与 TipTap JSON 的 { type, attrs: { href } }
+      const rawHref = typeof mark.href === 'string' ? mark.href : mark.attrs?.href
+      const href = sanitizeUrl(typeof rawHref === 'string' ? rawHref : undefined)
       return href ? { type: 'link', href } : null
     }
     default:
@@ -50,6 +52,15 @@ function normalizeInlines(raw: unknown): Inline[] {
   return out
 }
 
+/**
+ * heading 级别钳制到 1-3（schema 上限），非法输入回落为 2。
+ * 校验端与 tiptapToBlocks 共用，保证两条入口对级别的处理一致。
+ */
+export function normalizeHeadingLevel(raw: unknown): 1 | 2 | 3 {
+  const n = typeof raw === 'number' ? raw : 2
+  return Math.min(3, Math.max(1, Math.round(n))) as 1 | 2 | 3
+}
+
 function normalizeBlock(raw: unknown): Block | null {
   if (!raw || typeof raw !== 'object') return null
   const b = raw as Record<string, unknown>
@@ -58,11 +69,8 @@ function normalizeBlock(raw: unknown): Block | null {
     case 'paragraph':
       return { type: 'paragraph', children: normalizeInlines(b.children) }
 
-    case 'heading': {
-      const rawLevel = typeof b.level === 'number' ? b.level : 2
-      const level = Math.min(3, Math.max(1, Math.round(rawLevel))) as 1 | 2 | 3
-      return { type: 'heading', level, children: normalizeInlines(b.children) }
-    }
+    case 'heading':
+      return { type: 'heading', level: normalizeHeadingLevel(b.level), children: normalizeInlines(b.children) }
 
     case 'bulletList':
     case 'orderedList': {

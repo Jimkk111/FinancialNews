@@ -40,6 +40,7 @@ export const useAiSessionStore = defineStore('aiSession', () => {
     sessions.value.find(s => s.sessionId === currentSessionId.value)
   )
 
+  // 根据搜索词过滤会话列表
   const filteredSessions = computed(() => {
     if (!searchQuery.value) return sessions.value
     const query = searchQuery.value.toLowerCase()

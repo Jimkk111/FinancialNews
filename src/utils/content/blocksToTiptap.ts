@@ -45,7 +45,7 @@ function blockToPM(block: Block): JSONContent {
         content: block.code ? [{ type: 'text', text: block.code }] : [],
       }
     case 'image':
-      return { type: 'image', attrs: { src: block.src, alt: block.alt ?? null } }
+      return { type: 'image', attrs: { src: block.src, alt: block.alt ?? null, caption: block.caption ?? null } }
     case 'video':
       return { type: 'video', attrs: { src: block.src, poster: block.poster ?? null } }
     case 'divider':

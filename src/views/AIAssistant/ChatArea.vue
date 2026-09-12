@@ -16,6 +16,7 @@ const quickQuestions = [
   '新手如何理财？',
 ]
 
+// 自动滚动到底部
 function scrollToBottom() {
   nextTick(() => {
     messagesEndRef.value?.scrollIntoView({ behavior: 'smooth' })
@@ -70,6 +71,7 @@ function handleQuickQuestion(question: string) {
         />
       </div>
 
+      <!-- 会话加载时应该隐藏 -->
       <div v-else class="chat__welcome">
         <div class="chat__welcome-icon">
           <n-icon :component="Sparkles" :size="24" />
@@ -90,6 +92,7 @@ function handleQuickQuestion(question: string) {
         </div>
       </div>
 
+      <!-- 哨兵元素 -->
       <div ref="messagesEndRef" />
     </div>
   </div>

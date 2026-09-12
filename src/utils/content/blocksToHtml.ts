@@ -56,10 +56,15 @@ function blockToHtml(block: Block): string {
       return `<blockquote>${block.children.map(blockToHtml).join('')}</blockquote>`
     case 'codeBlock':
       return `<pre><code${block.lang ? ` class="language-${escapeAttr(block.lang)}"` : ''}>${escapeHtml(block.code)}</code></pre>`
-    case 'image':
-      return `<img src="${escapeAttr(block.src)}"${block.alt ? ` alt="${escapeAttr(block.alt)}"` : ''}>`
+    case 'image': {
+      const img = `<img src="${escapeAttr(block.src)}"${block.alt ? ` alt="${escapeAttr(block.alt)}"` : ''}>`
+      // 图注用 figure/figcaption 承载，与展示端 BlockImage 及 htmlToBlocks 的解析保持对称
+      return block.caption
+        ? `<figure>${img}<figcaption>${escapeHtml(block.caption)}</figcaption></figure>`
+        : img
+    }
     case 'video':
-      return `<video controls src="${escapeAttr(block.src)}"></video>`
+      return `<video controls src="${escapeAttr(block.src)}"${block.poster ? ` poster="${escapeAttr(block.poster)}"` : ''}></video>`
     case 'divider':
       return '<hr>'
   }

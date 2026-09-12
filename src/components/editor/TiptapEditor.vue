@@ -7,7 +7,7 @@ import type { ArticleContent } from '@/types/content'
 import { tiptapToBlocks } from '@/utils/content/tiptapToBlocks'
 import { blocksToTiptap } from '@/utils/content/blocksToTiptap'
 import StarterKit from '@tiptap/starter-kit'
-import Image from '@tiptap/extension-image'
+import { Image } from './extensions/Image'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import {
