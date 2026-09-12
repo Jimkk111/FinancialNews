@@ -42,3 +42,7 @@ coverage
 # Vite
 *.local
 docs/lighthouse_report/localhost_5173-20260519T173626.html
+
+# 依赖备份/损坏目录（勿提交）
+node_modules_broken
+node_modules_pnpm_bak

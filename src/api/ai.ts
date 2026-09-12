@@ -98,8 +98,12 @@ export async function healthCheck(): Promise<{ status: string }> {
 
 // ============================================================
 // 流式对话
-// 与 axios 主通道不同，SSE 走 fetch：这里单独对齐统一错误契约
-// （{ code, msg } 响应壳）、401 登录态清理与空闲超时。
+// 后端契约：POST /ai/chat/stream（SseEmitter，JWT 走 HttpOnly Cookie）
+//   data: {"content": "..."}   逐段正文
+//   data: {"sessionId": "..."} 结束前回传会话 ID
+//   data: [DONE]              正常结束标记
+// 失败时后端 completeWithError 直接断流（不会发 [DONE]）；
+// 也兼容显式 { error } 事件的实现。错误统一走 { code, msg } 响应壳。
 // ============================================================
 
 export interface StreamChatResult {
@@ -204,13 +208,22 @@ export function streamChat(
 
       const decoder = new TextDecoder()
       let buffer = ''
+      // 兼容以显式 { error } 事件报告失败的实现（当前后端是直接断流）
+      let streamError: string | undefined
 
       const consumeEvents = (events: string[]): boolean => {
         // 返回 true 表示流正常结束（收到 [DONE]）
         for (const data of events) {
           if (data === '[DONE]') return true
           try {
-            const parsed = JSON.parse(data) as { content?: unknown; sessionId?: unknown }
+            const parsed = JSON.parse(data) as {
+              content?: unknown
+              sessionId?: unknown
+              error?: unknown
+            }
+            if (typeof parsed.error === 'string' && parsed.error) {
+              streamError = parsed.error
+            }
             if (typeof parsed.content === 'string' && parsed.content) {
               content += parsed.content
               onChunk(parsed.content)
@@ -225,18 +238,33 @@ export function streamChat(
         return false
       }
 
-      while (true) {
+      let done = false
+      while (!done) {
         const result = await readWithIdleTimeout(reader, controller.signal)
         if (result.done) break
 
         const { events, rest } = extractSseEvents(buffer + decoder.decode(result.value, { stream: true }))
         buffer = rest
-        if (consumeEvents(events)) return finalize(false)
+        done = consumeEvents(events)
       }
 
       // 流结束但未收到 [DONE]，把残余不完整行也消费掉
-      const { events } = extractSseEvents(buffer, true)
-      consumeEvents(events)
+      if (!done) {
+        const { events } = extractSseEvents(buffer, true)
+        done = consumeEvents(events)
+      }
+
+      // 流内错误优先于部分内容：交由调用方展示后端错误信息
+      if (streamError) {
+        throw new ApiError('500', streamError)
+      }
+
+      // 后端 completeWithError / 网关超时等会直接断流，不会发 [DONE]：
+      // 此时回复不完整，按错误处理（已收到的部分内容由调用方保留展示）
+      if (!done) {
+        throw new ApiError('500', content ? 'AI 响应中断，内容可能不完整' : 'AI 服务连接中断，请重试')
+      }
+
       return finalize(false)
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {

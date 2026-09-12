@@ -21,7 +21,8 @@ describe('extractSseEvents', () => {
   })
 
   it('跨 chunk 的数据拼接后可解析', () => {
-    const first = extractSseEvents('data:{"content":"你"')
+    // chunk 边界落在字符串中间：data:{"content":"你 | 好"}
+    const first = extractSseEvents('data:{"content":"你')
     const second = extractSseEvents(first.rest + '好"}\n')
     expect(second.events).toEqual(['{"content":"你好"}'])
   })

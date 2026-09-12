@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
-import { normalizeChatMessages, normalizeSession, normalizeSessions } from '../ai'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '../request'
+import { normalizeChatMessages, normalizeSession, normalizeSessions, streamChat } from '../ai'
 
 describe('normalizeSession', () => {
   it('兼容 snake_case 字段', () => {
@@ -71,5 +72,130 @@ describe('normalizeChatMessages', () => {
   it('直接接受数组', () => {
     const messages = normalizeChatMessages([{ role: 'assistant', content: '回复' }])
     expect(messages).toEqual([{ role: 'assistant', content: '回复' }])
+  })
+})
+
+describe('streamChat', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  type StubResponse = {
+    ok: boolean
+    status: number
+    headers: { get: (key: string) => string | null }
+    body?: ReadableStream<Uint8Array>
+    json?: () => Promise<unknown>
+  }
+
+  /** 用 ReadableStream 模拟后端 SSE 响应，记录请求的 URL 与 body */
+  function stubFetchSse(chunks: string[], options?: { close?: boolean }) {
+    const requests: Array<{ url: string; init?: RequestInit }> = []
+    const fetchMock = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      requests.push({ url: String(url), init })
+      const encoder = new TextEncoder()
+      const signal = init?.signal as AbortSignal | undefined
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          for (const chunk of chunks) controller.enqueue(encoder.encode(chunk))
+          if (options?.close) controller.close()
+          // 模拟真实 fetch：请求被 abort 时底层流以 AbortError 中断
+          signal?.addEventListener('abort', () => {
+            controller.error(new DOMException('The operation was aborted.', 'AbortError'))
+          })
+        },
+      })
+      const response: StubResponse = {
+        ok: true,
+        status: 200,
+        headers: { get: (key) => (key.toLowerCase() === 'content-type' ? 'text/event-stream' : null) },
+        body,
+      }
+      return response
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    return { fetchMock, requests }
+  }
+
+  it('请求 POST /ai/chat/stream,body 不带 stream 字段', async () => {
+    const { requests } = stubFetchSse(['data: {"content":"hi"}\n\n', 'data: [DONE]\n\n'])
+
+    const handle = streamChat([{ role: 'user', content: '你好' }], () => {})
+    const result = await handle.promise
+
+    expect(requests[0]!.url).toBe('/api/ai/chat/stream')
+    expect(JSON.parse(requests[0]!.init!.body as string)).toEqual({
+      messages: [{ role: 'user', content: '你好' }],
+    })
+    expect(result.aborted).toBe(false)
+    expect(result.content).toBe('hi')
+  })
+
+  it('按序回调分片并在结束时汇聚 sessionId', async () => {
+    stubFetchSse([
+      'data: {"content":"你"}\n\n',
+      'data: {"content":"好"}\n\n',
+      'data: {"sessionId":"session-abc12345"}\n\n',
+      'data: [DONE]\n\n',
+    ])
+
+    const received: string[] = []
+    const handle = streamChat([{ role: 'user', content: '你好' }], (chunk) => received.push(chunk))
+    const result = await handle.promise
+
+    expect(received).toEqual(['你', '好'])
+    expect(result.content).toBe('你好')
+    expect(result.sessionId).toBe('session-abc12345')
+  })
+
+  it('流内 error 事件以 ApiError 抛出，而不是静默成空回复', async () => {
+    stubFetchSse(['data: {"error":"AI服务暂时不可用"}\n\n', 'data: [DONE]\n\n'])
+
+    const handle = streamChat([{ role: 'user', content: '你好' }], () => {})
+    const error = await handle.promise.catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect((error as ApiError).message).toBe('AI服务暂时不可用')
+  })
+
+  it('后端未发 [DONE] 即断流时按错误处理（completeWithError 场景）', async () => {
+    // 发出一段内容后直接关闭流，模拟 SseEmitter.completeWithError
+    stubFetchSse(['data: {"content":"部分"}\n\n'], { close: true })
+
+    const handle = streamChat([{ role: 'user', content: '你好' }], () => {})
+    const error = await handle.promise.catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect((error as ApiError).message).toContain('中断')
+  })
+
+  it('调用方中止后保留已收到的部分内容', async () => {
+    // 首个分片后不再发送数据，等待调用方 abort
+    stubFetchSse(['data: {"content":"部分"}\n\n'])
+
+    const received: string[] = []
+    const handle = streamChat([{ role: 'user', content: '你好' }], (chunk) => received.push(chunk))
+
+    await vi.waitFor(() => expect(received).toEqual(['部分']))
+    handle.abort()
+
+    const result = await handle.promise
+    expect(result.aborted).toBe(true)
+    expect(result.content).toBe('部分')
+  })
+
+  it('HTTP 错误时抛出统一响应壳中的 msg', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: false,
+        status: 500,
+        json: async () => ({ code: '500', msg: 'AI服务调用失败' }),
+        headers: { get: () => 'application/json' },
+      })),
+    )
+
+    const handle = streamChat([{ role: 'user', content: '你好' }], () => {})
+    await expect(handle.promise).rejects.toMatchObject({ message: 'AI服务调用失败' })
   })
 })

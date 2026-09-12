@@ -1,3 +1,6 @@
+// @vitest-environment jsdom
+// DOMPurify 依赖符合规范的 NodeIterator；happy-dom 的迭代器会把根节点一并返回，
+// 导致首节点被误删、<script> 反而残留。DOMPurify 的消毒断言须在 jsdom 下验证。
 import { describe, expect, it } from 'vitest'
 import { renderMarkdown } from '../markdown'
 
