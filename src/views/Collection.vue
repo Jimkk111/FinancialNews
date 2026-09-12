@@ -171,6 +171,11 @@ onMounted(fetchFavorites)
   background-color: var(--nb-bg-subtle);
   min-height: 100vh;
 
+  // 桌面端限宽居中
+  @include respond-to('md') {
+    padding-top: $sp-4;
+  }
+
   &__state {
     @include flex(row, center, center);
     padding: $sp-12 $sp-4;
@@ -179,6 +184,14 @@ onMounted(fetchFavorites)
   &__list {
     background-color: var(--nb-surface);
     border-bottom: 1px solid var(--nb-border);
+
+    @include respond-to('md') {
+      max-width: 720px;
+      margin: 0 auto;
+      border: 1px solid var(--nb-border);
+      border-radius: $radius-lg;
+      overflow: hidden;
+    }
   }
 
   &__item {

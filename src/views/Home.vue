@@ -41,7 +41,12 @@ const handleTabChange = (tab: string) => {
 
 <template>
   <div class="nb-page">
-    <Header :avatar="authStore.user?.avatar || null" @user-click="handleUserClick" />
+    <Header
+      :avatar="authStore.user?.avatar || null"
+      :active-nav="'home'"
+      @user-click="handleUserClick"
+      @nav-click="handleTabChange"
+    />
 
     <main class="nb-page-body nb-page-body--with-nav">
       <div class="home__search">
@@ -57,10 +62,16 @@ const handleTabChange = (tab: string) => {
 
 <style scoped lang="scss">
 @use '../styles/variables' as *;
+@use '../styles/mixins' as *;
 
 .home {
   &__search {
     padding: $sp-4 $sp-4 $sp-3;
+
+    // 桌面端由 nb-page-body 提供侧边距
+    @include respond-to('md') {
+      padding: $sp-3 0;
+    }
   }
 }
 </style>

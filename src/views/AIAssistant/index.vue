@@ -141,6 +141,11 @@ onMounted(() => {
     min-height: 0;
     padding-top: $header-height;
     padding-bottom: calc(#{$bottom-nav-height} + 120px);
+
+    // 桌面端：底部导航隐藏，输入框贴底
+    @include respond-to('md') {
+      padding-bottom: 120px;
+    }
   }
 
   &__input {
@@ -150,6 +155,11 @@ onMounted(() => {
     bottom: $bottom-nav-height;
     z-index: $z-sticky;
     background-color: var(--nb-bg);
+
+    // 桌面端贴底
+    @include respond-to('md') {
+      bottom: 0;
+    }
   }
 }
 </style>

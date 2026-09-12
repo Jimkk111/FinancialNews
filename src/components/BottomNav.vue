@@ -57,6 +57,11 @@ const handleTabClick = (id: string) => {
   padding: $sp-1 $sp-4;
   padding-bottom: calc(#{$sp-1} + env(safe-area-inset-bottom, 0px));
 
+  // 桌面端隐藏底部导航（导航收进顶栏）
+  @include respond-to('md') {
+    display: none;
+  }
+
   &__inner {
     display: flex;
     align-items: center;
