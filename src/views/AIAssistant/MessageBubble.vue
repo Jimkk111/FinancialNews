@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, watchEffect, nextTick } from 'vue'
 import { NIcon } from 'naive-ui'
-import { Check, Copy, RefreshCw, Sparkles } from 'lucide-vue-next'
+import { Brain, Check, ChevronDown, Copy, RefreshCw, Sparkles } from 'lucide-vue-next'
 import { renderMarkdown } from '@/utils/markdown'
 import type { Message } from '@/types'
 
@@ -26,6 +26,43 @@ const formattedTime = computed(() => {
 
 const isUser = computed(() => props.message.role === 'user')
 const isStreaming = computed(() => props.message.status === 'streaming')
+
+// ---- 深度思考面板 ----
+const hasReasoning = computed(() => !!props.message.reasoning)
+
+// 思考中：思考链已在滚动但正文未到，面板保持展开
+const thinkingActive = computed(
+  () => isStreaming.value && !props.message.content && hasReasoning.value
+)
+
+const reasoningExpanded = ref(false)
+// 思考开始自动展开、正文到达自动折叠；期间手动折叠不被覆盖（依赖未变不会重跑）
+watchEffect(() => {
+  reasoningExpanded.value = thinkingActive.value
+})
+
+const reasoningBodyRef = ref<HTMLElement | null>(null)
+// 思考链滚动期间吸附底部，类似终端输出
+watch(
+  () => props.message.reasoning,
+  () => {
+    if (!thinkingActive.value) return
+    nextTick(() => {
+      const el = reasoningBodyRef.value
+      if (el) el.scrollTop = el.scrollHeight
+    })
+  }
+)
+
+const reasoningTitle = computed(() => {
+  if (thinkingActive.value) return '思考中…'
+  const seconds = props.message.reasoningSeconds
+  return seconds ? `已深度思考（用时 ${seconds} 秒）` : '已深度思考'
+})
+
+function toggleReasoning() {
+  reasoningExpanded.value = !reasoningExpanded.value
+}
 
 const copied = ref(false)
 let copiedTimer: ReturnType<typeof setTimeout> | undefined
@@ -71,6 +108,33 @@ function handleRegenerate() {
       <div v-if="!isUser" class="bubble__name">AI 助手</div>
 
       <div class="bubble__content">
+        <!-- 深度思考面板：思考链为纯文本（pre-wrap），不走 Markdown 渲染 -->
+        <div v-if="!isUser && hasReasoning" class="bubble__reasoning">
+          <button
+            class="bubble__reasoning-toggle"
+            :aria-expanded="reasoningExpanded"
+            @click="toggleReasoning"
+          >
+            <n-icon :component="Brain" :size="13" />
+            <span>{{ reasoningTitle }}</span>
+            <n-icon
+              class="bubble__reasoning-chevron"
+              :class="{ 'bubble__reasoning-chevron--open': reasoningExpanded }"
+              :component="ChevronDown"
+              :size="13"
+            />
+          </button>
+          <!-- 思考中限高内部滚动吸附底部；结束后展开完整阅读 -->
+          <div
+            v-show="reasoningExpanded"
+            ref="reasoningBodyRef"
+            class="bubble__reasoning-body"
+            :class="{ 'bubble__reasoning-body--live': thinkingActive }"
+          >
+            <p>{{ message.reasoning }}</p>
+          </div>
+        </div>
+
         <!-- AI 回复经 renderMarkdown 消毒后渲染，防注入 -->
         <div
           v-if="!isUser"
@@ -164,6 +228,56 @@ function handleRegenerate() {
     line-height: $lh-relaxed;
     white-space: pre-line;
     word-break: break-word;
+  }
+
+  &__reasoning {
+    margin-bottom: $sp-2;
+    background-color: var(--nb-hover);
+    border-radius: $radius-md;
+  }
+
+  &__reasoning-toggle {
+    @include flex(row, flex-start, center, $sp-1);
+    width: 100%;
+    padding: $sp-2 $sp-3;
+    font-size: $fs-xs;
+    text-align: left;
+    color: var(--nb-text-secondary);
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: color $dur-fast $ease;
+
+    &:hover {
+      color: var(--nb-text);
+    }
+  }
+
+  &__reasoning-chevron {
+    transition: transform $dur-fast $ease;
+
+    &--open {
+      transform: rotate(180deg);
+    }
+  }
+
+  &__reasoning-body {
+    padding: 0 $sp-3 $sp-2;
+    font-size: $fs-xs;
+    line-height: $lh-relaxed;
+    color: var(--nb-text-secondary);
+
+    p {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    // 思考中限高内部滚动，避免整页被思考链拽着滚动
+    &--live {
+      max-height: 32vh;
+      overflow-y: auto;
+    }
   }
 
   &__cursor {

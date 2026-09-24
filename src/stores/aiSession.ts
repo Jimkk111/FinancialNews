@@ -161,6 +161,7 @@ export const useAiSessionStore = defineStore('aiSession', () => {
         id: `${sessionId}-${index}`,
         role: msg.role,
         content: msg.content,
+        reasoning: msg.reasoning || undefined,
         timestamp: new Date(),
         status: 'complete' as const
       }))
@@ -231,6 +232,10 @@ export const useAiSessionStore = defineStore('aiSession', () => {
     const aiMessageId = createMessageId()
     let hasCreatedMessage = false
     let currentContent = ''
+    let currentReasoning = ''
+    // 思考耗时：首个思考增量到首个正文增量的间隔（秒），无思考链时为 null
+    let reasoningStartedAt: number | null = null
+    let reasoningSeconds: number | null = null
     let flushTimer: ReturnType<typeof setTimeout> | null = null
 
     const flushContent = () => {
@@ -238,7 +243,29 @@ export const useAiSessionStore = defineStore('aiSession', () => {
       if (epoch !== streamEpoch) return
       // 原地修改已有对象属性，确保 Vue Proxy 能精确追踪变更并触发响应式更新
       const aiMsg = messages.value.find(m => m.id === aiMessageId)
-      if (aiMsg) aiMsg.content = currentContent
+      if (aiMsg) {
+        aiMsg.content = currentContent
+        aiMsg.reasoning = currentReasoning || undefined
+      }
+    }
+
+    // 首个思考/正文增量到达时创建占位消息，后续增量走批量刷新
+    const ensureMessage = () => {
+      if (!hasCreatedMessage) {
+        messages.value = [...messages.value, {
+          id: aiMessageId,
+          role: 'assistant',
+          content: currentContent,
+          reasoning: currentReasoning || undefined,
+          timestamp: new Date(),
+          status: 'streaming'
+        }]
+        hasCreatedMessage = true
+        return
+      }
+      if (flushTimer === null) {
+        flushTimer = setTimeout(flushContent, CHUNK_FLUSH_INTERVAL)
+      }
     }
 
     function removeMessage(id: string) {
@@ -275,22 +302,17 @@ export const useAiSessionStore = defineStore('aiSession', () => {
         sessionIdValue,
         (chunk) => {
           if (epoch !== streamEpoch) return
+          if (reasoningStartedAt !== null && reasoningSeconds === null) {
+            reasoningSeconds = Math.max(1, Math.round((Date.now() - reasoningStartedAt) / 1000))
+          }
           currentContent += chunk
-
-          if (!hasCreatedMessage) {
-            messages.value = [...messages.value, {
-              id: aiMessageId,
-              role: 'assistant',
-              content: currentContent,
-              timestamp: new Date(),
-              status: 'streaming'
-            }]
-            hasCreatedMessage = true
-            return
-          }
-          if (flushTimer === null) {
-            flushTimer = setTimeout(flushContent, CHUNK_FLUSH_INTERVAL)
-          }
+          ensureMessage()
+        },
+        (chunk) => {
+          if (epoch !== streamEpoch) return
+          if (reasoningStartedAt === null) reasoningStartedAt = Date.now()
+          currentReasoning += chunk
+          ensureMessage()
         }
       )
       activeStream = { abort }
@@ -311,18 +333,23 @@ export const useAiSessionStore = defineStore('aiSession', () => {
       }
 
       const aiMsg = messages.value.find(m => m.id === aiMessageId)
-      if (result.aborted && !result.content) {
+      if (result.aborted && !result.content && !result.reasoning) {
         // 未收到任何内容即停止：移除占位消息
         if (aiMsg) removeMessage(aiMessageId)
       } else if (aiMsg) {
         // 原地修改已有对象属性，确保 Vue Proxy 能精确追踪变更并触发响应式更新
-        aiMsg.content = result.content || 'AI暂无回应'
+        aiMsg.content = result.content
+        aiMsg.reasoning = result.reasoning || undefined
+        if (reasoningSeconds !== null) aiMsg.reasoningSeconds = reasoningSeconds
         aiMsg.status = 'complete'
+        // 无正文也无思考链（服务端正常收尾但没输出）时兜底占位文案
+        if (!aiMsg.content && !aiMsg.reasoning) aiMsg.content = 'AI暂无回应'
       } else {
         messages.value = [...messages.value, {
           id: aiMessageId,
           role: 'assistant',
           content: result.content || 'AI暂无回应',
+          reasoning: result.reasoning || undefined,
           timestamp: new Date(),
           status: 'complete'
         }]
@@ -333,9 +360,9 @@ export const useAiSessionStore = defineStore('aiSession', () => {
       if (flushTimer !== null) clearTimeout(flushTimer)
       if (epoch !== streamEpoch) return
 
-      // 保留用户消息与已收到的部分回复便于重试，仅移除空的占位消息
+      // 保留用户消息与已收到的部分回复（正文或思考链）便于重试，仅移除空占位消息
       const aiMsg = messages.value.find(m => m.id === aiMessageId)
-      if (aiMsg && !aiMsg.content) {
+      if (aiMsg && !aiMsg.content && !aiMsg.reasoning) {
         removeMessage(aiMessageId)
       } else if (aiMsg) {
         aiMsg.status = 'complete'

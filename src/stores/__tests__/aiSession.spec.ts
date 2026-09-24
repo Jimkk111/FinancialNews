@@ -40,12 +40,15 @@ const startStreamingChatMock = vi.mocked(startStreamingChat)
 /** 构造可控的流式 handle：测试中手动派发 chunk / 完成 / 中止 */
 function createStreamHandle() {
   let capturedOnChunk: ((chunk: string) => void) | undefined
+  let capturedOnReasoning: ((chunk: string) => void) | undefined
   let capturedResolve: ((result: StreamChatResult) => void) | undefined
+  let capturedReject: ((error: unknown) => void) | undefined
   const abort = vi.fn()
 
   const handle: StreamChatHandle = {
-    promise: new Promise<StreamChatResult>((resolve) => {
+    promise: new Promise<StreamChatResult>((resolve, reject) => {
       capturedResolve = resolve
+      capturedReject = reject
     }),
     abort,
   }
@@ -54,10 +57,13 @@ function createStreamHandle() {
     handle,
     abort,
     onChunk: (chunk: string) => capturedOnChunk?.(chunk),
+    onReasoning: (chunk: string) => capturedOnReasoning?.(chunk),
     resolve: (result: StreamChatResult) => capturedResolve?.(result),
+    reject: (error: unknown) => capturedReject?.(error),
     inject: () => {
-      startStreamingChatMock.mockImplementation((_messages, _sessionId, onChunk) => {
+      startStreamingChatMock.mockImplementation((_messages, _sessionId, onChunk, onReasoning) => {
         capturedOnChunk = onChunk
+        capturedOnReasoning = onReasoning
         return handle
       })
     },
@@ -94,7 +100,7 @@ describe('useAiSessionStore', () => {
       await flushMicrotasks()
       expect(store.messages[1]!.status).toBe('streaming')
 
-      stream.resolve({ content: '完整回答', sessionId: 'sess-1', aborted: false })
+      stream.resolve({ content: '完整回答', reasoning: '', sessionId: 'sess-1', aborted: false })
       await sending
 
       expect(store.currentSessionId).toBe('sess-1')
@@ -119,7 +125,7 @@ describe('useAiSessionStore', () => {
       store.stopGeneration()
       expect(stream.abort).toHaveBeenCalled()
 
-      stream.resolve({ content: '部分内容', aborted: true })
+      stream.resolve({ content: '部分内容', reasoning: '', aborted: true })
       await sending
 
       expect(store.messages).toHaveLength(2)
@@ -139,11 +145,110 @@ describe('useAiSessionStore', () => {
       await flushMicrotasks()
 
       store.stopGeneration()
-      stream.resolve({ content: '', aborted: true })
+      stream.resolve({ content: '', reasoning: '', aborted: true })
       await sending
 
       expect(store.messages).toHaveLength(1)
       expect(store.messages[0]!.role).toBe('user')
+    })
+
+    it('思考链先于正文流式展示，完成后保留 reasoning 与思考耗时', async () => {
+      createSessionMock.mockResolvedValue('sess-1')
+      const stream = createStreamHandle()
+      stream.inject()
+
+      const store = useAiSessionStore()
+      const sending = store.sendMessage('你好')
+      await flushMicrotasks()
+
+      // 思考链先到：占位消息已创建，正文仍为空
+      stream.onReasoning('让我想想')
+      await flushMicrotasks()
+      expect(store.messages).toHaveLength(2)
+      expect(store.messages[1]!.role).toBe('assistant')
+      expect(store.messages[1]!.status).toBe('streaming')
+      expect(store.messages[1]!.content).toBe('')
+      expect(store.messages[1]!.reasoning).toBe('让我想想')
+
+      // 正文开始到达，期间思考链继续增量
+      stream.onChunk('正文')
+      stream.onReasoning('补充思考')
+      await flushMicrotasks()
+
+      stream.resolve({
+        content: '正文回答',
+        reasoning: '让我想想补充思考',
+        sessionId: 'sess-1',
+        aborted: false,
+      })
+      await sending
+
+      expect(store.messages[1]!.content).toBe('正文回答')
+      expect(store.messages[1]!.reasoning).toBe('让我想想补充思考')
+      expect(store.messages[1]!.reasoningSeconds).toBeGreaterThanOrEqual(1)
+      expect(store.messages[1]!.status).toBe('complete')
+    })
+
+    it('非思考型模型无 reasoning 时消息不带该字段', async () => {
+      createSessionMock.mockResolvedValue('sess-1')
+      const stream = createStreamHandle()
+      stream.inject()
+
+      const store = useAiSessionStore()
+      const sending = store.sendMessage('你好')
+      await flushMicrotasks()
+
+      stream.onChunk('直接回答')
+      stream.resolve({ content: '直接回答', reasoning: '', sessionId: 'sess-1', aborted: false })
+      await sending
+
+      expect(store.messages[1]!.content).toBe('直接回答')
+      expect(store.messages[1]!.reasoning).toBeUndefined()
+    })
+
+    it('思考中停止生成时保留已收到的思考链', async () => {
+      createSessionMock.mockResolvedValue('sess-1')
+      const stream = createStreamHandle()
+      stream.inject()
+
+      const store = useAiSessionStore()
+      const sending = store.sendMessage('写一篇长文')
+      await flushMicrotasks()
+
+      stream.onReasoning('部分思考')
+      await flushMicrotasks()
+
+      store.stopGeneration()
+      expect(stream.abort).toHaveBeenCalled()
+      stream.resolve({ content: '', reasoning: '部分思考', aborted: true })
+      await sending
+
+      expect(store.messages).toHaveLength(2)
+      expect(store.messages[1]!.content).toBe('')
+      expect(store.messages[1]!.reasoning).toBe('部分思考')
+      expect(store.messages[1]!.status).toBe('complete')
+    })
+
+    it('思考链已到但流式失败时保留思考链并提示错误', async () => {
+      createSessionMock.mockResolvedValue('sess-1')
+      const stream = createStreamHandle()
+      stream.inject()
+
+      const store = useAiSessionStore()
+      const sending = store.sendMessage('你好')
+      await flushMicrotasks()
+
+      stream.onReasoning('思考了但没结果')
+      await flushMicrotasks()
+
+      stream.reject(new ApiError('500', 'AI 响应内容为空'))
+      await sending
+
+      expect(toast.error).toHaveBeenCalledWith('AI 响应内容为空')
+      expect(store.messages).toHaveLength(2)
+      expect(store.messages[1]!.content).toBe('')
+      expect(store.messages[1]!.reasoning).toBe('思考了但没结果')
+      expect(store.messages[1]!.status).toBe('complete')
     })
 
     it('请求失败时保留用户消息并弹出错误提示', async () => {
@@ -184,13 +289,32 @@ describe('useAiSessionStore', () => {
       await flushMicrotasks()
 
       stream.onChunk('迟到的片段')
-      stream.resolve({ content: '迟到的完整回复', aborted: false })
+      stream.resolve({ content: '迟到的完整回复', reasoning: '', aborted: false })
       await sending
       await flushMicrotasks()
 
       // sess-2 的消息列表为空，旧流结果被丢弃
       expect(store.messages).toHaveLength(0)
       expect(store.currentSessionId).toBe('sess-2')
+    })
+  })
+
+  describe('selectSession', () => {
+    it('加载历史会话时保留 assistant 思考链', async () => {
+      getSessionMessagesMock.mockResolvedValue([
+        { role: 'user', content: '问' },
+        { role: 'assistant', content: '答', reasoning: '历史思考' },
+        { role: 'assistant', content: '非思考回复' },
+      ])
+
+      const store = useAiSessionStore()
+      await store.selectSession('sess-h')
+
+      expect(store.currentSessionId).toBe('sess-h')
+      expect(store.messages[1]!.content).toBe('答')
+      expect(store.messages[1]!.reasoning).toBe('历史思考')
+      expect(store.messages[1]!.status).toBe('complete')
+      expect(store.messages[2]!.reasoning).toBeUndefined()
     })
   })
 
@@ -203,7 +327,7 @@ describe('useAiSessionStore', () => {
       const store = useAiSessionStore()
       const first = store.sendMessage('第一问')
       await flushMicrotasks()
-      stream1.resolve({ content: '第一答', aborted: false })
+      stream1.resolve({ content: '第一答', reasoning: '', aborted: false })
       await first
       expect(store.messages).toHaveLength(2)
 
@@ -216,7 +340,7 @@ describe('useAiSessionStore', () => {
       expect(store.messages[0]!.role).toBe('user')
       expect(store.messages[0]!.content).toBe('第一问')
 
-      stream2.resolve({ content: '重新回答', aborted: false })
+      stream2.resolve({ content: '重新回答', reasoning: '', aborted: false })
       await regenerating
 
       expect(store.messages).toHaveLength(2)

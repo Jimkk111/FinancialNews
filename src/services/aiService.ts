@@ -26,17 +26,23 @@ export async function updateSessionTitle(sessionId: string, title: string): Prom
 export async function chatCompletion(
   messages: ChatMessage[],
   sessionId?: string,
-): Promise<{ role: 'assistant'; content: string; sessionId?: string }> {
+): Promise<{ role: 'assistant'; content: string; reasoning?: string; sessionId?: string }> {
   const data = await aiApi.chatCompletion({ messages, sessionId, stream: false })
-  return { role: 'assistant', content: data.content, sessionId: data.sessionId }
+  return {
+    role: 'assistant',
+    content: data.content,
+    reasoning: data.reasoning || undefined,
+    sessionId: data.sessionId,
+  }
 }
 
 export function startStreamingChat(
   messages: ChatMessage[],
   sessionId: string | undefined,
   onChunk: (chunk: string) => void,
+  onReasoning?: (chunk: string) => void,
 ): StreamChatHandle {
-  return aiApi.streamChat(messages, onChunk, sessionId)
+  return aiApi.streamChat(messages, onChunk, sessionId, onReasoning)
 }
 
 export async function healthCheck(): Promise<void> {

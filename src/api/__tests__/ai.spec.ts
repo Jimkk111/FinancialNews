@@ -73,6 +73,19 @@ describe('normalizeChatMessages', () => {
     const messages = normalizeChatMessages([{ role: 'assistant', content: '回复' }])
     expect(messages).toEqual([{ role: 'assistant', content: '回复' }])
   })
+
+  it('assistant 思考链归一化为 reasoning（兼容 camelCase / snake_case）', () => {
+    const messages = normalizeChatMessages([
+      { role: 'assistant', content: '回复一', reasoningContent: '思考一' },
+      { role: 'assistant', content: '回复二', reasoning_content: '思考二' },
+      { role: 'assistant', content: '非思考模型回复' },
+    ])
+    expect(messages).toEqual([
+      { role: 'assistant', content: '回复一', reasoning: '思考一' },
+      { role: 'assistant', content: '回复二', reasoning: '思考二' },
+      { role: 'assistant', content: '非思考模型回复' },
+    ])
+  })
 })
 
 describe('streamChat', () => {
@@ -146,6 +159,41 @@ describe('streamChat', () => {
     expect(received).toEqual(['你', '好'])
     expect(result.content).toBe('你好')
     expect(result.sessionId).toBe('session-abc12345')
+  })
+
+  it('思考链事件走 onReasoning 增量回调并在结果中拼接', async () => {
+    stubFetchSse([
+      'data: {"sessionId":"session-1"}\n\n',
+      'data: {"reasoning":"用户在测试。"}\n\n',
+      'data: {"reasoning":"继续思考"}\n\n',
+      'data: {"content":"你好"}\n\n',
+      'data: [DONE]\n\n',
+    ])
+
+    const reasoningChunks: string[] = []
+    const contentChunks: string[] = []
+    const handle = streamChat(
+      [{ role: 'user', content: '你好' }],
+      (chunk) => contentChunks.push(chunk),
+      undefined,
+      (chunk) => reasoningChunks.push(chunk),
+    )
+    const result = await handle.promise
+
+    expect(reasoningChunks).toEqual(['用户在测试。', '继续思考'])
+    expect(contentChunks).toEqual(['你好'])
+    expect(result.reasoning).toBe('用户在测试。继续思考')
+    expect(result.content).toBe('你好')
+    expect(result.sessionId).toBe('session-1')
+  })
+
+  it('非思考型模型无 reasoning 事件时结果为空串', async () => {
+    stubFetchSse(['data: {"content":"hi"}\n\n', 'data: [DONE]\n\n'])
+
+    const handle = streamChat([{ role: 'user', content: '你好' }], () => {})
+    const result = await handle.promise
+
+    expect(result.reasoning).toBe('')
   })
 
   it('流内 error 事件以 ApiError 抛出，而不是静默成空回复', async () => {

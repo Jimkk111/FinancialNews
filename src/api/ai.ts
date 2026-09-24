@@ -54,7 +54,10 @@ export function normalizeChatMessages(raw: unknown): ChatMessage[] {
       if (!source) return null
       const role = source.role === 'assistant' ? 'assistant' : 'user'
       const content = typeof source.content === 'string' ? source.content : ''
-      return content ? ({ role, content } as ChatMessage) : null
+      if (!content) return null
+      // 思考型模型的 assistant 回复带完整思考链，兼容 camelCase / snake_case，可能缺失
+      const reasoning = pickString(source, ['reasoningContent', 'reasoning_content'])
+      return reasoning ? { role, content, reasoning } : { role, content }
     })
     .filter((item): item is ChatMessage => item !== null)
 }
@@ -88,8 +91,8 @@ export async function chatCompletion(data: {
   messages: ChatMessage[]
   sessionId?: string
   stream?: boolean
-}): Promise<{ content: string; sessionId: string }> {
-  return post<{ content: string; sessionId: string }>('/ai/chat', data)
+}): Promise<{ content: string; sessionId?: string; reasoning?: string }> {
+  return post<{ content: string; sessionId?: string; reasoning?: string }>('/ai/chat', data)
 }
 
 export async function healthCheck(): Promise<{ status: string }> {
@@ -99,9 +102,12 @@ export async function healthCheck(): Promise<{ status: string }> {
 // ============================================================
 // 流式对话
 // 后端契约：POST /ai/chat/stream（SseEmitter，JWT 走 HttpOnly Cookie）
+//   data: {"sessionId": "..."} 请求受理即发送（绑定会话）
+//   data: {"reasoning": "..."} 思考链增量，出现在正文之前（思考型模型）
 //   data: {"content": "..."}   逐段正文
-//   data: {"sessionId": "..."} 结束前回传会话 ID
+//   data: {"error": "..."}     仅异常场景（如只有思考链没有正文），发送后仍会 [DONE]
 //   data: [DONE]              正常结束标记
+// 静默期后端每 15s 发送注释行 ":keep-alive"，extractSseEvents 只取 data: 行天然忽略。
 // 失败时后端 completeWithError 直接断流（不会发 [DONE]）；
 // 也兼容显式 { error } 事件的实现。错误统一走 { code, msg } 响应壳。
 // ============================================================
@@ -109,6 +115,8 @@ export async function healthCheck(): Promise<{ status: string }> {
 export interface StreamChatResult {
   /** 累积的完整回复内容 */
   content: string
+  /** 累积的完整思考链，非思考型模型为空串 */
+  reasoning: string
   sessionId?: string
   /** true 表示被调用方主动中止（保留已收到的部分内容） */
   aborted: boolean
@@ -168,15 +176,18 @@ export function streamChat(
   messages: ChatMessage[],
   onChunk: (chunk: string) => void,
   sessionId?: string,
+  onReasoning?: (chunk: string) => void,
 ): StreamChatHandle {
   const controller = new AbortController()
 
   const promise = (async (): Promise<StreamChatResult> => {
     let content = ''
+    let reasoning = ''
     let receivedSessionId: string | undefined
 
     const finalize = (aborted: boolean): StreamChatResult => ({
       content,
+      reasoning,
       sessionId: receivedSessionId,
       aborted,
     })
@@ -218,11 +229,16 @@ export function streamChat(
           try {
             const parsed = JSON.parse(data) as {
               content?: unknown
+              reasoning?: unknown
               sessionId?: unknown
               error?: unknown
             }
             if (typeof parsed.error === 'string' && parsed.error) {
               streamError = parsed.error
+            }
+            if (typeof parsed.reasoning === 'string' && parsed.reasoning) {
+              reasoning += parsed.reasoning
+              onReasoning?.(parsed.reasoning)
             }
             if (typeof parsed.content === 'string' && parsed.content) {
               content += parsed.content
