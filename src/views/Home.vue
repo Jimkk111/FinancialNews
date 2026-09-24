@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Header, BottomNav, NewsList, SearchBar, CategoryTabs } from '@/components'
+import { Header, BottomNav, NewsList, SearchBar, CategoryTabs,BackToTop } from '@/components'
 import { useAuthStore } from '@/stores/auth'
 
 defineOptions({ name: 'Home' })
@@ -50,6 +50,8 @@ const handleTabChange = (tab: string) => {
       <CategoryTabs @category-change="selectedCategoryId = $event" />
       <NewsList :category-id="selectedCategoryId" @news-click="handleNewsClick" />
     </main>
+
+    <BackToTop />
 
     <BottomNav active-tab="home" @tab-change="handleTabChange" />
   </div>
