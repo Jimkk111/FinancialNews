@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import type { ChatMessage, Message, SessionInfo } from '@/types'
 import { ApiError } from '@/api/request'
+import { toast } from '@/utils/toast'
 import {
   createSession,
   getSessions,
@@ -20,6 +21,10 @@ export interface SessionGroup {
 
 const CONVERSATIONS_CACHE_KEY = 'aiAssistantConversations'
 const LAST_SESSION_KEY = 'aiAssistantLastSessionId'
+
+// 服务不可用的内联横幅文案：属于持续性状态，不用自动消失的 toast；
+// checkHealth 恢复时按此常量匹配清除
+const SERVICE_DOWN_BANNER = '后端服务不可用，正在自动重试连接'
 
 // 流式 chunk 按 50ms 批量刷入消息，避免每个 token 都触发响应式更新与 Markdown 重渲染
 const CHUNK_FLUSH_INTERVAL = 50
@@ -91,12 +96,16 @@ export const useAiSessionStore = defineStore('aiSession', () => {
   const hasMessages = computed(() => messages.value.length > 0)
 
   async function checkHealth(): Promise<boolean> {
+    const wasHealthy = isServiceHealthy.value
     try {
       await healthCheck()
       isServiceHealthy.value = true
+      if (error.value === SERVICE_DOWN_BANNER) error.value = null
       return true
     } catch {
       isServiceHealthy.value = false
+      // 使用中途断连才提示；首次进入的失败由 init 的横幅说明，避免双重提示
+      if (wasHealthy === true) toast.warning('AI 服务连接已断开，恢复后将自动重试')
       return false
     }
   }
@@ -137,6 +146,9 @@ export const useAiSessionStore = defineStore('aiSession', () => {
 
   async function selectSession(sessionId: string) {
     abortActiveStream()
+    // 先关侧滑抽屉再加载：抽屉是模态的（带全屏遮罩），
+    // 若加载失败时才关，遮罩会把整页挡住无法操作
+    sidebarOpen.value = false
 
     try {
       isLoading.value = true
@@ -155,12 +167,11 @@ export const useAiSessionStore = defineStore('aiSession', () => {
 
       currentSessionId.value = sessionId
       messages.value = formattedMessages
-      sidebarOpen.value = false
 
       localStorage.setItem(LAST_SESSION_KEY, sessionId)
     } catch (e) {
       console.error('selectSession failed:', e)
-      error.value = '加载会话失败，请重试'
+      toast.error('加载会话失败，请重试')
     } finally {
       isLoading.value = false
     }
@@ -182,7 +193,7 @@ export const useAiSessionStore = defineStore('aiSession', () => {
 
       return true
     } catch {
-      error.value = '删除会话失败，请重试'
+      toast.error('删除会话失败，请重试')
       return false
     }
   }
@@ -193,7 +204,7 @@ export const useAiSessionStore = defineStore('aiSession', () => {
       await loadSessions()
       return true
     } catch {
-      error.value = '修改会话标题失败，请重试'
+      toast.error('修改会话标题失败，请重试')
       return false
     }
   }
@@ -241,7 +252,7 @@ export const useAiSessionStore = defineStore('aiSession', () => {
         const newSessionId = await createSession()
         if (epoch !== streamEpoch) return
         if (!newSessionId) {
-          error.value = '创建会话失败，请重试'
+          toast.error('创建会话失败，请重试')
           removeMessage(userMessage.id)
           return
         }
@@ -329,9 +340,8 @@ export const useAiSessionStore = defineStore('aiSession', () => {
       } else if (aiMsg) {
         aiMsg.status = 'complete'
       }
-      error.value = e instanceof ApiError && e.message
-        ? e.message
-        : '发送消息失败，请重试'
+      // 后端错误信息（ApiError.message）直接展示给用户，其余给通用文案
+      toast.error(e instanceof ApiError && e.message ? e.message : '发送消息失败，请重试')
     } finally {
       if (epoch === streamEpoch) {
         activeStream = null
@@ -385,7 +395,7 @@ export const useAiSessionStore = defineStore('aiSession', () => {
     await loadSessions()
 
     if (!healthy) {
-      error.value = '后端服务不可用，请检查服务是否运行'
+      error.value = SERVICE_DOWN_BANNER
       return
     }
 

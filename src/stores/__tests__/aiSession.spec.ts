@@ -13,7 +13,18 @@ vi.mock('@/services/aiService', () => ({
   healthCheck: vi.fn(),
 }))
 
+vi.mock('@/utils/toast', () => ({
+  toast: {
+    error: vi.fn(),
+    warning: vi.fn(),
+    success: vi.fn(),
+    info: vi.fn(),
+  },
+  errorMessage: vi.fn(),
+}))
+
 import { useAiSessionStore } from '../aiSession'
+import { toast } from '@/utils/toast'
 import {
   createSession,
   getSessions,
@@ -135,7 +146,7 @@ describe('useAiSessionStore', () => {
       expect(store.messages[0]!.role).toBe('user')
     })
 
-    it('请求失败时保留用户消息并展示错误信息', async () => {
+    it('请求失败时保留用户消息并弹出错误提示', async () => {
       createSessionMock.mockResolvedValue('sess-1')
       startStreamingChatMock.mockReturnValue({
         promise: Promise.reject(new ApiError('500', '模型服务过载')),
@@ -145,7 +156,8 @@ describe('useAiSessionStore', () => {
       const store = useAiSessionStore()
       await store.sendMessage('你好')
 
-      expect(store.error).toBe('模型服务过载')
+      expect(toast.error).toHaveBeenCalledWith('模型服务过载')
+      expect(store.error).toBeNull()
       expect(store.messages).toHaveLength(1)
       expect(store.messages[0]!.role).toBe('user')
       expect(store.isSending).toBe(false)
