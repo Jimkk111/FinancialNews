@@ -7,6 +7,7 @@ import { FileText } from 'lucide-vue-next'
 import { getNewsList } from '@/services/newsService'
 import { formatTime } from '@/utils/format'
 import NewsItem from './NewsItem.vue'
+import NewsListSkeleton from './NewsListSkeleton.vue'
 import type { NewsItem as NewsItemType } from '@/types'
 
 interface Props {
@@ -135,10 +136,8 @@ onUnmounted(() => {
 
 <template>
   <div class="nb-news-list">
-    <div v-if="loading && newsData.length === 0" class="nb-news-list__state">
-      <n-spin size="medium" />
-      <span class="nb-news-list__state-text">加载中...</span>
-    </div>
+    <!-- 首屏加载用骨架屏占位，形状与 NewsItem 一致 -->
+    <NewsListSkeleton v-if="loading && newsData.length === 0" />
 
     <div v-else-if="error && newsData.length === 0" class="nb-news-list__state">
       <n-empty description="获取新闻列表失败，请稍后重试">
@@ -210,10 +209,6 @@ onUnmounted(() => {
     @include flex(column, center, center, $sp-3);
     padding: $sp-12 $sp-4;
     color: var(--nb-text-tertiary);
-  }
-
-  &__state-text {
-    font-size: $fs-sm;
   }
 
   &__hint {
