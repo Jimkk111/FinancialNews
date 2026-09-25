@@ -43,16 +43,25 @@ const handleTabChange = (tab: string) => {
 const SWIPE_THRESHOLD = 60    // 最小水平位移（px），低于视为点击/误触
 const DIRECTION_RATIO = 1.5   // 方向锁：|Δx| 需超过 |Δy| 的倍数，避免竖向滚动列表时误触发
 
-const listAreaRef = ref<HTMLElement | null>(null)
+// 手势区绑在 main 上并用最小高度撑满视口，空分类/短列表时下方空白也可滑；
+// tab 条（自身横滚）与搜索栏通过起点检查排除，不参与切分类
+const mainRef = ref<HTMLElement | null>(null)
 let startX = 0
 let startY = 0
+let gestureArmed = false
 
 function onTouchStart(e: TouchEvent) {
+  if ((e.target as HTMLElement).closest('.nb-tabs, .home__search')) {
+    gestureArmed = false
+    return
+  }
+  gestureArmed = true
   startX = e.touches[0]!.clientX
   startY = e.touches[0]!.clientY
 }
 
 function onTouchEnd(e: TouchEvent) {
+  if (!gestureArmed) return
   const dx = e.changedTouches[0]!.clientX - startX
   const dy = e.changedTouches[0]!.clientY - startY
   if (Math.abs(dx) < SWIPE_THRESHOLD) return
@@ -65,13 +74,13 @@ function onTouchEnd(e: TouchEvent) {
 // 进入/离开页面要用 onActivated/onDeactivated 挂载/移除监听
 onActivated(() => {
   // 只读坐标不调 preventDefault，passive 保证不阻塞页面自身滚动
-  listAreaRef.value?.addEventListener('touchstart', onTouchStart, { passive: true })
-  listAreaRef.value?.addEventListener('touchend', onTouchEnd, { passive: true })
+  mainRef.value?.addEventListener('touchstart', onTouchStart, { passive: true })
+  mainRef.value?.addEventListener('touchend', onTouchEnd, { passive: true })
 })
 
 onDeactivated(() => {
-  listAreaRef.value?.removeEventListener('touchstart', onTouchStart)
-  listAreaRef.value?.removeEventListener('touchend', onTouchEnd)
+  mainRef.value?.removeEventListener('touchstart', onTouchStart)
+  mainRef.value?.removeEventListener('touchend', onTouchEnd)
 })
 </script>
 
@@ -79,14 +88,12 @@ onDeactivated(() => {
   <div class="nb-page">
     <Header :avatar="authStore.user?.avatar || null" @user-click="handleUserClick" />
 
-    <main class="nb-page-body nb-page-body--with-nav">
+    <main ref="mainRef" class="nb-page-body nb-page-body--with-nav home__main">
       <div class="home__search">
         <SearchBar @search="handleSearch" />
       </div>
       <CategoryTabs />
-      <div ref="listAreaRef">
-        <NewsList :category-id="categoryStore.activeCategoryId" @news-click="handleNewsClick" />
-      </div>
+      <NewsList :category-id="categoryStore.activeCategoryId" @news-click="handleNewsClick" />
     </main>
 
     <BackToTop />
@@ -101,6 +108,11 @@ onDeactivated(() => {
 .home {
   &__search {
     padding: $sp-4 $sp-4 $sp-3;
+  }
+
+  // 撑满视口，保证空分类/短列表时下方空白区域也在手势监听范围内
+  &__main {
+    min-height: 100dvh;
   }
 }
 </style>
