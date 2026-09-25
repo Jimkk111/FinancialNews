@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onActivated, onDeactivated, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Header, BottomNav, NewsList, SearchBar, CategoryTabs,BackToTop } from '@/components'
 import { useAuthStore } from '@/stores/auth'
@@ -37,6 +38,41 @@ const handleTabChange = (tab: string) => {
     router.push(routePath)
   }
 }
+
+// ---------- 列表区域左右滑动切换分类（移动端手势） ----------
+const SWIPE_THRESHOLD = 60    // 最小水平位移（px），低于视为点击/误触
+const DIRECTION_RATIO = 1.5   // 方向锁：|Δx| 需超过 |Δy| 的倍数，避免竖向滚动列表时误触发
+
+const listAreaRef = ref<HTMLElement | null>(null)
+let startX = 0
+let startY = 0
+
+function onTouchStart(e: TouchEvent) {
+  startX = e.touches[0]!.clientX
+  startY = e.touches[0]!.clientY
+}
+
+function onTouchEnd(e: TouchEvent) {
+  const dx = e.changedTouches[0]!.clientX - startX
+  const dy = e.changedTouches[0]!.clientY - startY
+  if (Math.abs(dx) < SWIPE_THRESHOLD) return
+  if (Math.abs(dx) < Math.abs(dy) * DIRECTION_RATIO) return
+  // 左滑 → 下一个分类，右滑 → 上一个；到头由 store 钳制
+  categoryStore.switchByOffset(dx < 0 ? 1 : -1)
+}
+
+// Home 被 keep-alive 缓存，onMounted/onUnmounted 只在应用生命周期内触发一次，
+// 进入/离开页面要用 onActivated/onDeactivated 挂载/移除监听
+onActivated(() => {
+  // 只读坐标不调 preventDefault，passive 保证不阻塞页面自身滚动
+  listAreaRef.value?.addEventListener('touchstart', onTouchStart, { passive: true })
+  listAreaRef.value?.addEventListener('touchend', onTouchEnd, { passive: true })
+})
+
+onDeactivated(() => {
+  listAreaRef.value?.removeEventListener('touchstart', onTouchStart)
+  listAreaRef.value?.removeEventListener('touchend', onTouchEnd)
+})
 </script>
 
 <template>
@@ -48,7 +84,9 @@ const handleTabChange = (tab: string) => {
         <SearchBar @search="handleSearch" />
       </div>
       <CategoryTabs />
-      <NewsList :category-id="categoryStore.activeCategoryId" @news-click="handleNewsClick" />
+      <div ref="listAreaRef">
+        <NewsList :category-id="categoryStore.activeCategoryId" @news-click="handleNewsClick" />
+      </div>
     </main>
 
     <BackToTop />
