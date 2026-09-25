@@ -65,9 +65,19 @@ $edge-offset: $sp-4;
     transition: transform $dur-base $ease, opacity $dur-base $ease,
         background-color $dur-fast $ease, color $dur-fast $ease;
 
-    &:hover{
-        background-color: var(--nb-hover);
-        color: var(--nb-text);
+    // 触屏设备点击后 :hover 会粘住（iOS 直至点击别处才清除），
+    // 半隐藏状态会被粘住的 hover 样式压住而失效；
+    // 悬停效果只对真正支持悬停的指针设备（鼠标/触控笔）生效
+    @media (hover: hover) and (pointer: fine) {
+        &:hover{
+            background-color: var(--nb-hover);
+            color: var(--nb-text);
+        }
+
+        &.is-hidden:hover{
+            transform: none;
+            opacity: 1;
+        }
     }
 
     &:active{
@@ -75,15 +85,10 @@ $edge-offset: $sp-4;
     }
 
     // 隐藏态：滑到右边界，一半探出屏幕外
+    // 50% 是自身宽度的一半，再走完 $edge-offset 的右边距，右缘正好越过视口一半
     &.is-hidden{
         transform: translateX(calc(50% + #{$edge-offset}));
         opacity: 0.5;
-
-        // 半隐藏时悬停同样恢复完整显示
-        &:hover{
-            transform: none;
-            opacity: 1;
-        }
     }
 
     .click{
