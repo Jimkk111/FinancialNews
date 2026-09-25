@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Header, BottomNav, NewsList, SearchBar, CategoryTabs,BackToTop } from '@/components'
 import { useAuthStore } from '@/stores/auth'
+import { useNewsCategoryStore } from '@/stores/newsCategory'
 
 defineOptions({ name: 'Home' })
 
 const router = useRouter()
 const authStore = useAuthStore()
-const selectedCategoryId = ref<number | null>(null)
+const categoryStore = useNewsCategoryStore()
 
 const handleNewsClick = (id: number) => {
   router.push(`/news/${id}`)
@@ -47,8 +47,8 @@ const handleTabChange = (tab: string) => {
       <div class="home__search">
         <SearchBar @search="handleSearch" />
       </div>
-      <CategoryTabs @category-change="selectedCategoryId = $event" />
-      <NewsList :category-id="selectedCategoryId" @news-click="handleNewsClick" />
+      <CategoryTabs />
+      <NewsList :category-id="categoryStore.activeCategoryId" @news-click="handleNewsClick" />
     </main>
 
     <BackToTop />

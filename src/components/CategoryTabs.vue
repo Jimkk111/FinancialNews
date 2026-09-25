@@ -1,56 +1,26 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { getNewsCategories } from '@/services/newsService'
+import { onMounted } from 'vue'
+import { useNewsCategoryStore } from '@/stores/newsCategory'
 
-interface Category {
-  id: number
-  name: string
-}
+const store = useNewsCategoryStore()
 
-const categories = ref<Category[]>([])
-const activeCategory = ref<number | null>(null)
-const loading = ref(true)
-
-const emit = defineEmits<{
-  categoryChange: [categoryId: number | null]
-}>()
-
-const fetchCategories = async () => {
-  try {
-    loading.value = true
-    const response = await getNewsCategories()
-    categories.value = (response as any).data ?? response
-  } catch (error) {
-    // 静默处理错误，保持 UI 稳定性
-  } finally {
-    loading.value = false
-  }
-}
+onMounted(() => {
+  void store.fetchCategories()
+})
 
 const handleCategoryClick = (categoryId: number | null) => {
-  activeCategory.value = categoryId
-  emit('categoryChange', categoryId)
+  store.switchTo(categoryId)
 }
-
-onMounted(fetchCategories)
 </script>
 
 <template>
   <div class="nb-tabs">
     <div class="nb-tabs__scroller">
       <button
+        v-for="category in store.items"
+        :key="category.id ?? 'all'"
         class="nb-tabs__item"
-        :class="{ 'is-active': activeCategory === null }"
-        @click="handleCategoryClick(null)"
-      >
-        全部
-      </button>
-
-      <button
-        v-for="category in categories"
-        :key="category.id"
-        class="nb-tabs__item"
-        :class="{ 'is-active': activeCategory === category.id }"
+        :class="{ 'is-active': store.activeCategoryId === category.id }"
         @click="handleCategoryClick(category.id)"
       >
         {{ category.name }}
