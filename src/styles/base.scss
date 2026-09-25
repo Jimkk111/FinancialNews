@@ -20,6 +20,10 @@ html {
   font-size: 16px;
   -webkit-text-size-adjust: 100%;
   scroll-behavior: smooth;
+  // 掐掉文档级横向滚动（fixed 元素探出视口边缘也会造成横向溢出）
+  overflow-x: clip;
+  // 禁止横向过度滚动被浏览器链成前进/后退导航手势
+  overscroll-behavior-x: none;
 }
 
 body {
