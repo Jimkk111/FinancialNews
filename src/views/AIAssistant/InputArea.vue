@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { NIcon, NSpin } from 'naive-ui'
-import { Send, Square } from 'lucide-vue-next'
+import { Globe, Send, Square } from 'lucide-vue-next'
 
 const props = defineProps<{
   disabled: boolean
   isSending: boolean
   isLoading: boolean
+  webSearch: boolean
 }>()
 
 const emit = defineEmits<{
   send: [content: string]
   stop: []
+  toggleWebSearch: []
 }>()
 
 const inputValue = ref('')
@@ -58,6 +60,16 @@ function handleKeydown(e: KeyboardEvent) {
   <div class="composer">
     <div class="composer__inner">
       <div class="composer__box" :class="{ 'is-disabled': disabled }">
+        <button
+          class="composer__tool"
+          :class="{ 'is-active': webSearch }"
+          :title="webSearch ? '联网搜索已开启（由 AI 判断是否需要搜索）' : '开启联网搜索'"
+          @click="emit('toggleWebSearch')"
+        >
+          <n-icon :component="Globe" :size="15" />
+          <span>联网</span>
+        </button>
+
         <textarea
           ref="textareaRef"
           v-model="inputValue"
@@ -123,6 +135,31 @@ function handleKeydown(e: KeyboardEvent) {
 
     &.is-disabled {
       opacity: 0.6;
+    }
+  }
+
+  &__tool {
+    @include flex(row, center, center, 4px);
+    flex-shrink: 0;
+    align-self: flex-end;
+    height: 28px;
+    margin-bottom: 1px;
+    padding: 0 10px;
+    font-size: $fs-xs;
+    color: var(--nb-text-tertiary);
+    background-color: var(--nb-surface-subtle);
+    border: 1px solid transparent;
+    border-radius: $radius-full;
+    transition: color $dur-fast $ease, background-color $dur-fast $ease, border-color $dur-fast $ease;
+
+    &:hover {
+      color: var(--nb-text);
+    }
+
+    &.is-active {
+      color: var(--nb-brand);
+      background-color: var(--nb-brand-subtle);
+      border-color: var(--nb-brand);
     }
   }
 

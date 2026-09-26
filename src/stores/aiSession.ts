@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import type { ChatMessage, Message, SessionInfo } from '@/types'
+import type { AiSource, ChatMessage, Message, SessionInfo } from '@/types'
 import { ApiError } from '@/api/request'
 import { toast } from '@/utils/toast'
 import {
@@ -21,6 +21,7 @@ export interface SessionGroup {
 
 const CONVERSATIONS_CACHE_KEY = 'aiAssistantConversations'
 const LAST_SESSION_KEY = 'aiAssistantLastSessionId'
+const WEB_SEARCH_KEY = 'aiAssistantWebSearch'
 
 // 服务不可用的内联横幅文案：属于持续性状态，不用自动消失的 toast；
 // checkHealth 恢复时按此常量匹配清除
@@ -45,6 +46,29 @@ export const useAiSessionStore = defineStore('aiSession', () => {
   const searchQuery = ref('')
   const sidebarOpen = ref(false)
   const isServiceHealthy = ref<boolean | null>(null)
+  // 联网搜索开关：跨会话记忆，随每条消息的流式请求下发
+  const webSearchEnabled = ref(
+    (() => {
+      try {
+        return localStorage.getItem(WEB_SEARCH_KEY) === '1'
+      } catch {
+        return false
+      }
+    })()
+  )
+
+  function setWebSearch(enabled: boolean) {
+    webSearchEnabled.value = enabled
+    try {
+      localStorage.setItem(WEB_SEARCH_KEY, enabled ? '1' : '0')
+    } catch {
+      // localStorage 不可用时仅影响持久化，开关本身照常生效
+    }
+  }
+
+  function toggleWebSearch() {
+    setWebSearch(!webSearchEnabled.value)
+  }
 
   // 进行中的流式请求句柄与代数：切换/新建/删除会话时通过递增代数
   // 使回调失效并中止连接，避免旧流写入新会话的消息列表
@@ -162,6 +186,7 @@ export const useAiSessionStore = defineStore('aiSession', () => {
         role: msg.role,
         content: msg.content,
         reasoning: msg.reasoning || undefined,
+        sources: msg.sources,
         timestamp: new Date(),
         status: 'complete' as const
       }))
@@ -233,6 +258,7 @@ export const useAiSessionStore = defineStore('aiSession', () => {
     let hasCreatedMessage = false
     let currentContent = ''
     let currentReasoning = ''
+    let currentSources: AiSource[] = []
     // 思考耗时：首个思考增量到首个正文增量的间隔（秒），无思考链时为 null
     let reasoningStartedAt: number | null = null
     let reasoningSeconds: number | null = null
@@ -246,10 +272,11 @@ export const useAiSessionStore = defineStore('aiSession', () => {
       if (aiMsg) {
         aiMsg.content = currentContent
         aiMsg.reasoning = currentReasoning || undefined
+        aiMsg.sources = currentSources.length > 0 ? [...currentSources] : undefined
       }
     }
 
-    // 首个思考/正文增量到达时创建占位消息，后续增量走批量刷新
+    // 首个来源/思考/正文增量到达时创建占位消息，后续增量走批量刷新
     const ensureMessage = () => {
       if (!hasCreatedMessage) {
         messages.value = [...messages.value, {
@@ -257,6 +284,7 @@ export const useAiSessionStore = defineStore('aiSession', () => {
           role: 'assistant',
           content: currentContent,
           reasoning: currentReasoning || undefined,
+          sources: currentSources.length > 0 ? [...currentSources] : undefined,
           timestamp: new Date(),
           status: 'streaming'
         }]
@@ -297,10 +325,10 @@ export const useAiSessionStore = defineStore('aiSession', () => {
           content: msg.content
         }))
 
-      const { promise, abort } = startStreamingChat(
-        chatMessages,
-        sessionIdValue,
-        (chunk) => {
+      const { promise, abort } = startStreamingChat(chatMessages, {
+        sessionId: sessionIdValue,
+        webSearch: webSearchEnabled.value,
+        onChunk: (chunk) => {
           if (epoch !== streamEpoch) return
           if (reasoningStartedAt !== null && reasoningSeconds === null) {
             reasoningSeconds = Math.max(1, Math.round((Date.now() - reasoningStartedAt) / 1000))
@@ -308,13 +336,18 @@ export const useAiSessionStore = defineStore('aiSession', () => {
           currentContent += chunk
           ensureMessage()
         },
-        (chunk) => {
+        onReasoning: (chunk) => {
           if (epoch !== streamEpoch) return
           if (reasoningStartedAt === null) reasoningStartedAt = Date.now()
           currentReasoning += chunk
           ensureMessage()
+        },
+        onSources: (batch) => {
+          if (epoch !== streamEpoch) return
+          currentSources = currentSources.concat(batch)
+          ensureMessage()
         }
-      )
+      })
       activeStream = { abort }
 
       const result = await promise
@@ -333,7 +366,10 @@ export const useAiSessionStore = defineStore('aiSession', () => {
       }
 
       const aiMsg = messages.value.find(m => m.id === aiMessageId)
-      if (result.aborted && !result.content && !result.reasoning) {
+      const finalSources = result.sources.length > 0
+        ? result.sources
+        : currentSources.length > 0 ? [...currentSources] : undefined
+      if (result.aborted && !result.content && !result.reasoning && !finalSources) {
         // 未收到任何内容即停止：移除占位消息
         if (aiMsg) removeMessage(aiMessageId)
       } else if (aiMsg) {
@@ -341,15 +377,17 @@ export const useAiSessionStore = defineStore('aiSession', () => {
         aiMsg.content = result.content
         aiMsg.reasoning = result.reasoning || undefined
         if (reasoningSeconds !== null) aiMsg.reasoningSeconds = reasoningSeconds
+        aiMsg.sources = finalSources
         aiMsg.status = 'complete'
-        // 无正文也无思考链（服务端正常收尾但没输出）时兜底占位文案
-        if (!aiMsg.content && !aiMsg.reasoning) aiMsg.content = 'AI暂无回应'
+        // 正文、思考链、来源全都没有（服务端正常收尾但没输出）时兜底占位文案
+        if (!aiMsg.content && !aiMsg.reasoning && !aiMsg.sources) aiMsg.content = 'AI暂无回应'
       } else {
         messages.value = [...messages.value, {
           id: aiMessageId,
           role: 'assistant',
           content: result.content || 'AI暂无回应',
           reasoning: result.reasoning || undefined,
+          sources: finalSources,
           timestamp: new Date(),
           status: 'complete'
         }]
@@ -360,9 +398,9 @@ export const useAiSessionStore = defineStore('aiSession', () => {
       if (flushTimer !== null) clearTimeout(flushTimer)
       if (epoch !== streamEpoch) return
 
-      // 保留用户消息与已收到的部分回复（正文或思考链）便于重试，仅移除空占位消息
+      // 保留用户消息与已收到的部分回复（正文/思考链/来源）便于重试，仅移除空占位消息
       const aiMsg = messages.value.find(m => m.id === aiMessageId)
-      if (aiMsg && !aiMsg.content && !aiMsg.reasoning) {
+      if (aiMsg && !aiMsg.content && !aiMsg.reasoning && !(aiMsg.sources?.length)) {
         removeMessage(aiMessageId)
       } else if (aiMsg) {
         aiMsg.status = 'complete'
@@ -462,6 +500,9 @@ export const useAiSessionStore = defineStore('aiSession', () => {
     searchQuery,
     sidebarOpen,
     isServiceHealthy,
+    webSearchEnabled,
+    setWebSearch,
+    toggleWebSearch,
     currentSession,
     filteredSessions,
     groupedSessions,

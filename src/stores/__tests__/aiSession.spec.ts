@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import type { StreamChatHandle, StreamChatResult } from '@/api/ai'
+import type { StreamChatHandle, StreamChatOptions, StreamChatResult } from '@/api/ai'
+import type { AiSource } from '@/types'
 import { ApiError } from '@/api/request'
 
 vi.mock('@/services/aiService', () => ({
@@ -37,10 +38,9 @@ const getSessionsMock = vi.mocked(getSessions)
 const getSessionMessagesMock = vi.mocked(getSessionMessages)
 const startStreamingChatMock = vi.mocked(startStreamingChat)
 
-/** 构造可控的流式 handle：测试中手动派发 chunk / 完成 / 中止 */
+/** 构造可控的流式 handle：测试中手动派发增量 / 完成 / 中止 */
 function createStreamHandle() {
-  let capturedOnChunk: ((chunk: string) => void) | undefined
-  let capturedOnReasoning: ((chunk: string) => void) | undefined
+  let capturedOptions: StreamChatOptions | undefined
   let capturedResolve: ((result: StreamChatResult) => void) | undefined
   let capturedReject: ((error: unknown) => void) | undefined
   const abort = vi.fn()
@@ -56,14 +56,15 @@ function createStreamHandle() {
   return {
     handle,
     abort,
-    onChunk: (chunk: string) => capturedOnChunk?.(chunk),
-    onReasoning: (chunk: string) => capturedOnReasoning?.(chunk),
+    options: () => capturedOptions,
+    onChunk: (chunk: string) => capturedOptions?.onChunk(chunk),
+    onReasoning: (chunk: string) => capturedOptions?.onReasoning?.(chunk),
+    onSources: (batch: AiSource[]) => capturedOptions?.onSources?.(batch),
     resolve: (result: StreamChatResult) => capturedResolve?.(result),
     reject: (error: unknown) => capturedReject?.(error),
     inject: () => {
-      startStreamingChatMock.mockImplementation((_messages, _sessionId, onChunk, onReasoning) => {
-        capturedOnChunk = onChunk
-        capturedOnReasoning = onReasoning
+      startStreamingChatMock.mockImplementation((_messages, options) => {
+        capturedOptions = options
         return handle
       })
     },
@@ -100,7 +101,7 @@ describe('useAiSessionStore', () => {
       await flushMicrotasks()
       expect(store.messages[1]!.status).toBe('streaming')
 
-      stream.resolve({ content: '完整回答', reasoning: '', sessionId: 'sess-1', aborted: false })
+      stream.resolve({ content: '完整回答', reasoning: '', sources: [], sessionId: 'sess-1', aborted: false })
       await sending
 
       expect(store.currentSessionId).toBe('sess-1')
@@ -125,7 +126,7 @@ describe('useAiSessionStore', () => {
       store.stopGeneration()
       expect(stream.abort).toHaveBeenCalled()
 
-      stream.resolve({ content: '部分内容', reasoning: '', aborted: true })
+      stream.resolve({ content: '部分内容', reasoning: '', sources: [], aborted: true })
       await sending
 
       expect(store.messages).toHaveLength(2)
@@ -145,7 +146,7 @@ describe('useAiSessionStore', () => {
       await flushMicrotasks()
 
       store.stopGeneration()
-      stream.resolve({ content: '', reasoning: '', aborted: true })
+      stream.resolve({ content: '', reasoning: '', sources: [], aborted: true })
       await sending
 
       expect(store.messages).toHaveLength(1)
@@ -178,6 +179,7 @@ describe('useAiSessionStore', () => {
       stream.resolve({
         content: '正文回答',
         reasoning: '让我想想补充思考',
+        sources: [],
         sessionId: 'sess-1',
         aborted: false,
       })
@@ -199,7 +201,7 @@ describe('useAiSessionStore', () => {
       await flushMicrotasks()
 
       stream.onChunk('直接回答')
-      stream.resolve({ content: '直接回答', reasoning: '', sessionId: 'sess-1', aborted: false })
+      stream.resolve({ content: '直接回答', reasoning: '', sources: [], sessionId: 'sess-1', aborted: false })
       await sending
 
       expect(store.messages[1]!.content).toBe('直接回答')
@@ -220,7 +222,7 @@ describe('useAiSessionStore', () => {
 
       store.stopGeneration()
       expect(stream.abort).toHaveBeenCalled()
-      stream.resolve({ content: '', reasoning: '部分思考', aborted: true })
+      stream.resolve({ content: '', reasoning: '部分思考', sources: [], aborted: true })
       await sending
 
       expect(store.messages).toHaveLength(2)
@@ -248,6 +250,87 @@ describe('useAiSessionStore', () => {
       expect(store.messages).toHaveLength(2)
       expect(store.messages[1]!.content).toBe('')
       expect(store.messages[1]!.reasoning).toBe('思考了但没结果')
+      expect(store.messages[1]!.status).toBe('complete')
+    })
+
+    it('联网搜索开关随请求下发并持久化', async () => {
+      createSessionMock.mockResolvedValue('sess-1')
+      const stream = createStreamHandle()
+      stream.inject()
+
+      const store = useAiSessionStore()
+      expect(store.webSearchEnabled).toBe(false)
+
+      store.setWebSearch(true)
+      expect(localStorage.getItem('aiAssistantWebSearch')).toBe('1')
+
+      const first = store.sendMessage('今天A股行情')
+      await flushMicrotasks()
+      expect(stream.options()?.webSearch).toBe(true)
+      stream.resolve({ content: '答', reasoning: '', sources: [], sessionId: 'sess-1', aborted: false })
+      await first
+
+      const stream2 = createStreamHandle()
+      stream2.inject()
+      store.toggleWebSearch()
+      expect(localStorage.getItem('aiAssistantWebSearch')).toBe('0')
+
+      const second = store.sendMessage('再问')
+      await flushMicrotasks()
+      expect(stream2.options()?.webSearch).toBe(false)
+      stream2.resolve({ content: '答二', reasoning: '', sources: [], sessionId: 'sess-1', aborted: false })
+      await second
+    })
+
+    it('引用来源分批到达时追加到消息，完成后保留', async () => {
+      createSessionMock.mockResolvedValue('sess-1')
+      const stream = createStreamHandle()
+      stream.inject()
+
+      const store = useAiSessionStore()
+      const sending = store.sendMessage('最新消息')
+      await flushMicrotasks()
+
+      // 首批来源先于思考/正文到达：占位消息即携带来源
+      stream.onSources([{ title: 'A股大涨', url: 'https://a.com/1' }])
+      await flushMicrotasks()
+      expect(store.messages).toHaveLength(2)
+      expect(store.messages[1]!.status).toBe('streaming')
+      expect(store.messages[1]!.sources).toHaveLength(1)
+
+      stream.onReasoning('搜到的资料显示')
+      stream.onChunk('根据最新消息[1]')
+      await flushMicrotasks()
+
+      const allSources: AiSource[] = [
+        { title: 'A股大涨', url: 'https://a.com/1' },
+        { title: '央行降息', url: 'https://b.com/2' },
+      ]
+      stream.resolve({ content: '根据最新消息[1]', reasoning: '', sources: allSources, sessionId: 'sess-1', aborted: false })
+      await sending
+
+      expect(store.messages[1]!.sources).toEqual(allSources)
+      expect(store.messages[1]!.status).toBe('complete')
+    })
+
+    it('搜索阶段停止生成时保留已收到的来源', async () => {
+      createSessionMock.mockResolvedValue('sess-1')
+      const stream = createStreamHandle()
+      stream.inject()
+
+      const store = useAiSessionStore()
+      const sending = store.sendMessage('最新消息')
+      await flushMicrotasks()
+
+      stream.onSources([{ title: 'A股大涨', url: 'https://a.com/1' }])
+      await flushMicrotasks()
+
+      store.stopGeneration()
+      stream.resolve({ content: '', reasoning: '', sources: [{ title: 'A股大涨', url: 'https://a.com/1' }], aborted: true })
+      await sending
+
+      expect(store.messages).toHaveLength(2)
+      expect(store.messages[1]!.sources).toHaveLength(1)
       expect(store.messages[1]!.status).toBe('complete')
     })
 
@@ -289,7 +372,7 @@ describe('useAiSessionStore', () => {
       await flushMicrotasks()
 
       stream.onChunk('迟到的片段')
-      stream.resolve({ content: '迟到的完整回复', reasoning: '', aborted: false })
+      stream.resolve({ content: '迟到的完整回复', reasoning: '', sources: [], aborted: false })
       await sending
       await flushMicrotasks()
 
@@ -300,11 +383,15 @@ describe('useAiSessionStore', () => {
   })
 
   describe('selectSession', () => {
-    it('加载历史会话时保留 assistant 思考链', async () => {
+    it('加载历史会话时保留 assistant 思考链与引用来源', async () => {
       getSessionMessagesMock.mockResolvedValue([
         { role: 'user', content: '问' },
         { role: 'assistant', content: '答', reasoning: '历史思考' },
-        { role: 'assistant', content: '非思考回复' },
+        {
+          role: 'assistant',
+          content: '带来源的答',
+          sources: [{ title: 'A股大涨', url: 'https://a.com/1', siteName: '新浪财经' }],
+        },
       ])
 
       const store = useAiSessionStore()
@@ -315,6 +402,9 @@ describe('useAiSessionStore', () => {
       expect(store.messages[1]!.reasoning).toBe('历史思考')
       expect(store.messages[1]!.status).toBe('complete')
       expect(store.messages[2]!.reasoning).toBeUndefined()
+      expect(store.messages[2]!.sources).toEqual([
+        { title: 'A股大涨', url: 'https://a.com/1', siteName: '新浪财经' },
+      ])
     })
   })
 
@@ -327,7 +417,7 @@ describe('useAiSessionStore', () => {
       const store = useAiSessionStore()
       const first = store.sendMessage('第一问')
       await flushMicrotasks()
-      stream1.resolve({ content: '第一答', reasoning: '', aborted: false })
+      stream1.resolve({ content: '第一答', reasoning: '', sources: [], aborted: false })
       await first
       expect(store.messages).toHaveLength(2)
 
@@ -340,7 +430,7 @@ describe('useAiSessionStore', () => {
       expect(store.messages[0]!.role).toBe('user')
       expect(store.messages[0]!.content).toBe('第一问')
 
-      stream2.resolve({ content: '重新回答', reasoning: '', aborted: false })
+      stream2.resolve({ content: '重新回答', reasoning: '', sources: [], aborted: false })
       await regenerating
 
       expect(store.messages).toHaveLength(2)

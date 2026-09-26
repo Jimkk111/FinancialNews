@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, watchEffect, nextTick } from 'vue'
 import { NIcon } from 'naive-ui'
-import { Brain, Check, ChevronDown, Copy, RefreshCw, Sparkles } from 'lucide-vue-next'
+import { Brain, Check, ChevronDown, Copy, Globe, RefreshCw, Sparkles } from 'lucide-vue-next'
 import { renderMarkdown } from '@/utils/markdown'
 import type { Message } from '@/types'
 
@@ -62,6 +62,24 @@ const reasoningTitle = computed(() => {
 
 function toggleReasoning() {
   reasoningExpanded.value = !reasoningExpanded.value
+}
+
+// ---- 联网搜索引用来源 ----
+const sourcesList = computed(() => props.message.sources ?? [])
+const hasSources = computed(() => sourcesList.value.length > 0)
+
+// favicon 加载失败后回退到地球图标
+const brokenLogos = ref(new Set<string>())
+function handleLogoError(url: string) {
+  brokenLogos.value.add(url)
+}
+
+function sourceHost(url: string): string {
+  try {
+    return new URL(url).hostname
+  } catch {
+    return ''
+  }
 }
 
 const copied = ref(false)
@@ -133,6 +151,36 @@ function handleRegenerate() {
           >
             <p>{{ message.reasoning }}</p>
           </div>
+        </div>
+
+        <!-- 联网搜索引用来源：卡片编号与正文 [n] 引用对应，点击新窗口打开 -->
+        <div v-if="!isUser && hasSources" class="bubble__sources">
+          <a
+            v-for="(source, index) in sourcesList"
+            :key="`${index}-${source.url}`"
+            :href="source.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="bubble__source"
+            :title="source.summary || source.title"
+          >
+            <span class="bubble__source-index">{{ index + 1 }}</span>
+            <img
+              v-if="source.logoUrl && !brokenLogos.has(source.logoUrl)"
+              :src="source.logoUrl"
+              class="bubble__source-logo"
+              alt=""
+              @error="handleLogoError(source.logoUrl!)"
+            />
+            <n-icon v-else :component="Globe" :size="14" class="bubble__source-icon" />
+            <span class="bubble__source-info">
+              <span class="bubble__source-title">{{ source.title }}</span>
+              <span class="bubble__source-site">
+                {{ source.siteName || sourceHost(source.url) }}
+                <template v-if="source.publishTime"> · {{ source.publishTime }}</template>
+              </span>
+            </span>
+          </a>
         </div>
 
         <!-- AI 回复经 renderMarkdown 消毒后渲染，防注入 -->
@@ -278,6 +326,79 @@ function handleRegenerate() {
       max-height: 32vh;
       overflow-y: auto;
     }
+  }
+
+  &__sources {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: $sp-2;
+    margin-bottom: $sp-2;
+  }
+
+  &__source {
+    @include flex(row, flex-start, center, $sp-2);
+    min-width: 0;
+    padding: $sp-2 $sp-3;
+    text-decoration: none;
+    background-color: var(--nb-bg);
+    border: 1px solid var(--nb-border);
+    border-radius: $radius-md;
+    transition: border-color $dur-fast $ease, background-color $dur-fast $ease;
+
+    &:hover {
+      background-color: var(--nb-hover);
+      border-color: var(--nb-border-strong);
+    }
+  }
+
+  &__source-index {
+    @include flex(row, center, center);
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    font-size: 10px;
+    color: var(--nb-brand);
+    background-color: var(--nb-brand-subtle);
+    border-radius: $radius-sm;
+  }
+
+  &__source-logo,
+  &__source-icon {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+  }
+
+  &__source-logo {
+    border-radius: $radius-sm;
+    object-fit: cover;
+  }
+
+  &__source-icon {
+    color: var(--nb-text-tertiary);
+  }
+
+  &__source-info {
+    @include flex(column, flex-start, flex-start, 2px);
+    min-width: 0;
+  }
+
+  &__source-title {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: $fs-xs;
+    color: var(--nb-text);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__source-site {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 11px;
+    color: var(--nb-text-tertiary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   &__cursor {

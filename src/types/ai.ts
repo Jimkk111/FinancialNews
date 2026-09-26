@@ -3,6 +3,18 @@ export interface ChatMessage {
   content: string
   /** 思考型模型的完整思考链：仅历史消息归一化时填充，不回传后端 */
   reasoning?: string
+  /** 联网搜索引用来源：仅历史消息归一化时填充，不回传后端；下标与正文 [n] 引用对应 */
+  sources?: AiSource[]
+}
+
+/** 联网搜索引用来源 */
+export interface AiSource {
+  title: string
+  url: string
+  summary?: string
+  siteName?: string
+  publishTime?: string
+  logoUrl?: string
 }
 
 export interface SessionInfo {
@@ -23,6 +35,8 @@ export interface Message {
   reasoning?: string
   /** 思考耗时（秒），正文开始到达时记录，用于「已深度思考（用时 X 秒）」 */
   reasoningSeconds?: number
+  /** 联网搜索引用来源，未开搜索或模型未触发搜索时缺失 */
+  sources?: AiSource[]
   timestamp: Date
   status?: MessageStatus
 }

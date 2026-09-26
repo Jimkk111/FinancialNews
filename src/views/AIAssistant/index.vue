@@ -83,8 +83,10 @@ onUnmounted(() => {
         :disabled="!store.isServiceHealthy"
         :is-sending="store.isSending"
         :is-loading="store.isLoading"
+        :web-search="store.webSearchEnabled"
         @send="handleSend"
         @stop="store.stopGeneration"
+        @toggle-web-search="store.toggleWebSearch"
       />
     </div>
 

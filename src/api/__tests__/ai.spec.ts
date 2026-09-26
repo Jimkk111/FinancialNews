@@ -86,6 +86,58 @@ describe('normalizeChatMessages', () => {
       { role: 'assistant', content: '非思考模型回复' },
     ])
   })
+
+  it('assistant sources 归一化：历史接口的 JSON 字符串解析为数组', () => {
+    const messages = normalizeChatMessages({
+      messages: [
+        {
+          role: 'assistant',
+          content: '答',
+          sources: JSON.stringify([
+            { title: 'A股大涨', url: 'https://a.com/1', siteName: '新浪财经', summary: '摘要', publish_time: '2026-09-25' },
+          ]),
+        },
+        { role: 'assistant', content: '答二', sources: '不是合法 JSON' },
+        { role: 'assistant', content: '答三', sources: '[]' },
+        { role: 'assistant', content: '答四' },
+      ],
+    })
+    expect(messages[0]!.sources).toEqual([
+      {
+        title: 'A股大涨',
+        url: 'https://a.com/1',
+        summary: '摘要',
+        siteName: '新浪财经',
+        publishTime: '2026-09-25',
+        logoUrl: undefined,
+      },
+    ])
+    expect(messages[1]!.sources).toBeUndefined()
+    expect(messages[2]!.sources).toBeUndefined()
+    expect(messages[3]!.sources).toBeUndefined()
+  })
+
+  it('sources 数组项缺 url 时被过滤，缺 title 时回退为 url', () => {
+    const messages = normalizeChatMessages({
+      messages: [
+        {
+          role: 'assistant',
+          content: '答',
+          sources: JSON.stringify([{ title: '无链接' }, { url: 'https://b.com' }]),
+        },
+      ],
+    })
+    expect(messages[0]!.sources).toEqual([
+      {
+        title: 'https://b.com',
+        url: 'https://b.com',
+        summary: undefined,
+        siteName: undefined,
+        publishTime: undefined,
+        logoUrl: undefined,
+      },
+    ])
+  })
 })
 
 describe('streamChat', () => {
@@ -133,7 +185,7 @@ describe('streamChat', () => {
   it('请求 POST /ai/chat/stream,body 不带 stream 字段', async () => {
     const { requests } = stubFetchSse(['data: {"content":"hi"}\n\n', 'data: [DONE]\n\n'])
 
-    const handle = streamChat([{ role: 'user', content: '你好' }], () => {})
+    const handle = streamChat([{ role: 'user', content: '你好' }], { onChunk: () => {} })
     const result = await handle.promise
 
     expect(requests[0]!.url).toBe('/api/ai/chat/stream')
@@ -153,7 +205,7 @@ describe('streamChat', () => {
     ])
 
     const received: string[] = []
-    const handle = streamChat([{ role: 'user', content: '你好' }], (chunk) => received.push(chunk))
+    const handle = streamChat([{ role: 'user', content: '你好' }], { onChunk: (chunk) => received.push(chunk) })
     const result = await handle.promise
 
     expect(received).toEqual(['你', '好'])
@@ -172,12 +224,10 @@ describe('streamChat', () => {
 
     const reasoningChunks: string[] = []
     const contentChunks: string[] = []
-    const handle = streamChat(
-      [{ role: 'user', content: '你好' }],
-      (chunk) => contentChunks.push(chunk),
-      undefined,
-      (chunk) => reasoningChunks.push(chunk),
-    )
+    const handle = streamChat([{ role: 'user', content: '你好' }], {
+      onChunk: (chunk) => contentChunks.push(chunk),
+      onReasoning: (chunk) => reasoningChunks.push(chunk),
+    })
     const result = await handle.promise
 
     expect(reasoningChunks).toEqual(['用户在测试。', '继续思考'])
@@ -190,16 +240,66 @@ describe('streamChat', () => {
   it('非思考型模型无 reasoning 事件时结果为空串', async () => {
     stubFetchSse(['data: {"content":"hi"}\n\n', 'data: [DONE]\n\n'])
 
-    const handle = streamChat([{ role: 'user', content: '你好' }], () => {})
+    const handle = streamChat([{ role: 'user', content: '你好' }], { onChunk: () => {} })
     const result = await handle.promise
 
     expect(result.reasoning).toBe('')
   })
 
+  it('sources 事件按批回调并在结果中聚合', async () => {
+    stubFetchSse([
+      'data: {"sessionId":"session-1"}\n\n',
+      'data: {"sources":[{"title":"A股大涨","url":"https://a.com/1","siteName":"新浪财经"}]}\n\n',
+      'data: {"reasoning":"需要搜索最新行情"}\n\n',
+      'data: {"sources":[{"title":"央行降息","url":"https://b.com/2"}]}\n\n',
+      'data: {"content":"根据最新消息[1][2]"}\n\n',
+      'data: [DONE]\n\n',
+    ])
+
+    const batches: unknown[][] = []
+    const handle = streamChat([{ role: 'user', content: '今天行情' }], {
+      onChunk: () => {},
+      sessionId: 'session-1',
+      onSources: (batch) => batches.push([...batch]),
+    })
+    const result = await handle.promise
+
+    expect(batches).toHaveLength(2)
+    expect(batches[0]).toHaveLength(1)
+    expect(batches[1]).toHaveLength(1)
+    expect(result.sources).toHaveLength(2)
+    expect(result.sources[0]).toMatchObject({ title: 'A股大涨', siteName: '新浪财经' })
+    expect(result.sources[1]!.url).toBe('https://b.com/2')
+    expect(result.content).toBe('根据最新消息[1][2]')
+  })
+
+  it('无 sources 事件时结果为空数组', async () => {
+    stubFetchSse(['data: {"content":"hi"}\n\n', 'data: [DONE]\n\n'])
+
+    const handle = streamChat([{ role: 'user', content: '你好' }], { onChunk: () => {} })
+    const result = await handle.promise
+
+    expect(result.sources).toEqual([])
+  })
+
+  it('webSearch 开启时请求体带 webSearch:true，默认不带', async () => {
+    const first = stubFetchSse(['data: [DONE]\n\n'])
+    await streamChat([{ role: 'user', content: 'hi' }], {
+      onChunk: () => {},
+      sessionId: 'sess-1',
+      webSearch: true,
+    }).promise
+    expect(JSON.parse(first.requests[0]!.init!.body as string).webSearch).toBe(true)
+
+    const second = stubFetchSse(['data: [DONE]\n\n'])
+    await streamChat([{ role: 'user', content: 'hi' }], { onChunk: () => {} }).promise
+    expect(JSON.parse(second.requests[0]!.init!.body as string)).not.toHaveProperty('webSearch')
+  })
+
   it('流内 error 事件以 ApiError 抛出，而不是静默成空回复', async () => {
     stubFetchSse(['data: {"error":"AI服务暂时不可用"}\n\n', 'data: [DONE]\n\n'])
 
-    const handle = streamChat([{ role: 'user', content: '你好' }], () => {})
+    const handle = streamChat([{ role: 'user', content: '你好' }], { onChunk: () => {} })
     const error = await handle.promise.catch((e: unknown) => e)
 
     expect(error).toBeInstanceOf(ApiError)
@@ -210,7 +310,7 @@ describe('streamChat', () => {
     // 发出一段内容后直接关闭流，模拟 SseEmitter.completeWithError
     stubFetchSse(['data: {"content":"部分"}\n\n'], { close: true })
 
-    const handle = streamChat([{ role: 'user', content: '你好' }], () => {})
+    const handle = streamChat([{ role: 'user', content: '你好' }], { onChunk: () => {} })
     const error = await handle.promise.catch((e: unknown) => e)
 
     expect(error).toBeInstanceOf(ApiError)
@@ -222,7 +322,7 @@ describe('streamChat', () => {
     stubFetchSse(['data: {"content":"部分"}\n\n'])
 
     const received: string[] = []
-    const handle = streamChat([{ role: 'user', content: '你好' }], (chunk) => received.push(chunk))
+    const handle = streamChat([{ role: 'user', content: '你好' }], { onChunk: (chunk) => received.push(chunk) })
 
     await vi.waitFor(() => expect(received).toEqual(['部分']))
     handle.abort()
@@ -243,7 +343,7 @@ describe('streamChat', () => {
       })),
     )
 
-    const handle = streamChat([{ role: 'user', content: '你好' }], () => {})
+    const handle = streamChat([{ role: 'user', content: '你好' }], { onChunk: () => {} })
     await expect(handle.promise).rejects.toMatchObject({ message: 'AI服务调用失败' })
   })
 })

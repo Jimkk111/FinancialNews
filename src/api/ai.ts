@@ -1,5 +1,5 @@
 import { get, post, put, del, resolveUrl, ApiError } from './request'
-import type { ChatMessage, SessionInfo } from '@/types'
+import type { AiSource, ChatMessage, SessionInfo } from '@/types'
 import { extractSseEvents } from '@/utils/sse'
 
 // ============================================================
@@ -57,9 +57,48 @@ export function normalizeChatMessages(raw: unknown): ChatMessage[] {
       if (!content) return null
       // 思考型模型的 assistant 回复带完整思考链，兼容 camelCase / snake_case，可能缺失
       const reasoning = pickString(source, ['reasoningContent', 'reasoning_content'])
-      return reasoning ? { role, content, reasoning } : { role, content }
+      const sources = normalizeSources(source.sources)
+      return {
+        role,
+        content,
+        ...(reasoning ? { reasoning } : {}),
+        ...(sources ? { sources } : {}),
+      }
     })
     .filter((item): item is ChatMessage => item !== null)
+}
+
+function normalizeAiSource(raw: unknown): AiSource | null {
+  const source = asRecord(raw)
+  if (!source) return null
+  const url = pickString(source, ['url'])
+  if (!url) return null
+  return {
+    url,
+    title: pickString(source, ['title']) || url,
+    summary: pickString(source, ['summary']) || undefined,
+    siteName: pickString(source, ['siteName', 'site_name']) || undefined,
+    publishTime: pickString(source, ['publishTime', 'publish_time']) || undefined,
+    logoUrl: pickString(source, ['logoUrl', 'logo_url']) || undefined,
+  }
+}
+
+/**
+ * 归一化引用来源：流式事件与非流式响应为 JSON 数组，
+ * 历史接口为 JSON 字符串（DB 列原样返回），统一解析并过滤无效项
+ */
+export function normalizeSources(raw: unknown): AiSource[] | undefined {
+  let value = raw
+  if (typeof value === 'string') {
+    try {
+      value = JSON.parse(value)
+    } catch {
+      return undefined
+    }
+  }
+  if (!Array.isArray(value)) return undefined
+  const sources = value.map(normalizeAiSource).filter((item): item is AiSource => item !== null)
+  return sources.length > 0 ? sources : undefined
 }
 
 // ============================================================
@@ -90,9 +129,13 @@ export async function updateSessionTitle(sessionId: string, title: string): Prom
 export async function chatCompletion(data: {
   messages: ChatMessage[]
   sessionId?: string
+  webSearch?: boolean
   stream?: boolean
-}): Promise<{ content: string; sessionId?: string; reasoning?: string }> {
-  return post<{ content: string; sessionId?: string; reasoning?: string }>('/ai/chat', data)
+}): Promise<{ content: string; sessionId?: string; reasoning?: string; sources?: unknown }> {
+  return post<{ content: string; sessionId?: string; reasoning?: string; sources?: unknown }>(
+    '/ai/chat',
+    data,
+  )
 }
 
 export async function healthCheck(): Promise<{ status: string }> {
@@ -103,10 +146,12 @@ export async function healthCheck(): Promise<{ status: string }> {
 // 流式对话
 // 后端契约：POST /ai/chat/stream（SseEmitter，JWT 走 HttpOnly Cookie）
 //   data: {"sessionId": "..."} 请求受理即发送（绑定会话）
+//   data: {"sources": [...]}   联网搜索引用来源批次，webSearch 时随上游首包到达（可能多批）
 //   data: {"reasoning": "..."} 思考链增量，出现在正文之前（思考型模型）
-//   data: {"content": "..."}   逐段正文
+//   data: {"content": "..."}   逐段正文；开搜索后正文内含 [n] 引用编号，与 sources 下标对应
 //   data: {"error": "..."}     仅异常场景（如只有思考链没有正文），发送后仍会 [DONE]
 //   data: [DONE]              正常结束标记
+// 搜索由模型意图识别触发，开启 webSearch 也可能没有 sources 事件，按「有就渲染」处理。
 // 静默期后端每 15s 发送注释行 ":keep-alive"，extractSseEvents 只取 data: 行天然忽略。
 // 失败时后端 completeWithError 直接断流（不会发 [DONE]）；
 // 也兼容显式 { error } 事件的实现。错误统一走 { code, msg } 响应壳。
@@ -117,9 +162,24 @@ export interface StreamChatResult {
   content: string
   /** 累积的完整思考链，非思考型模型为空串 */
   reasoning: string
+  /** 累积的全部引用来源（多批合并），未开搜索为空数组 */
+  sources: AiSource[]
   sessionId?: string
   /** true 表示被调用方主动中止（保留已收到的部分内容） */
   aborted: boolean
+}
+
+export interface StreamChatOptions {
+  /** 关联会话；新会话首条消息由后端建会话后经 sessionId 事件回传 */
+  sessionId?: string
+  /** 开启联网搜索（意图识别模式下模型自行判断是否真的搜索） */
+  webSearch?: boolean
+  /** 正文增量回调 */
+  onChunk: (chunk: string) => void
+  /** 思考链增量回调 */
+  onReasoning?: (chunk: string) => void
+  /** 引用来源批次回调：sources 事件可能分多批到达，每次回调本批增量 */
+  onSources?: (batch: AiSource[]) => void
 }
 
 export interface StreamChatHandle {
@@ -172,22 +232,20 @@ function readWithIdleTimeout(reader: ReadableStreamDefaultReader<Uint8Array>, si
   })
 }
 
-export function streamChat(
-  messages: ChatMessage[],
-  onChunk: (chunk: string) => void,
-  sessionId?: string,
-  onReasoning?: (chunk: string) => void,
-): StreamChatHandle {
+export function streamChat(messages: ChatMessage[], options: StreamChatOptions): StreamChatHandle {
+  const { onChunk, onReasoning, onSources } = options
   const controller = new AbortController()
 
   const promise = (async (): Promise<StreamChatResult> => {
     let content = ''
     let reasoning = ''
+    const sources: AiSource[] = []
     let receivedSessionId: string | undefined
 
     const finalize = (aborted: boolean): StreamChatResult => ({
       content,
       reasoning,
+      sources: [...sources],
       sessionId: receivedSessionId,
       aborted,
     })
@@ -197,7 +255,12 @@ export function streamChat(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ messages, sessionId }),
+        // webSearch 关闭时不带该字段，保持旧请求体不变
+        body: JSON.stringify({
+          messages,
+          sessionId: options.sessionId,
+          ...(options.webSearch ? { webSearch: true } : {}),
+        }),
         signal: controller.signal,
       })
 
@@ -230,11 +293,17 @@ export function streamChat(
             const parsed = JSON.parse(data) as {
               content?: unknown
               reasoning?: unknown
+              sources?: unknown
               sessionId?: unknown
               error?: unknown
             }
             if (typeof parsed.error === 'string' && parsed.error) {
               streamError = parsed.error
+            }
+            const batch = normalizeSources(parsed.sources)
+            if (batch) {
+              sources.push(...batch)
+              onSources?.(batch)
             }
             if (typeof parsed.reasoning === 'string' && parsed.reasoning) {
               reasoning += parsed.reasoning
