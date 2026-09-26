@@ -187,7 +187,9 @@ export interface StreamChatHandle {
   abort: () => void
 }
 
-const IDLE_TIMEOUT = 30_000 // 30 秒无新数据视为连接异常
+const IDLE_TIMEOUT = 30_000 // 30 秒无新数据视为连接异常；任一字节到达（含心跳注释行）即重置
+// 联网搜索时模型先搜索再思考，首个事件合法地可能超 30s，放宽一倍避免误杀
+const WEB_SEARCH_IDLE_TIMEOUT = 60_000
 
 function extractErrorMessage(body: unknown, status: number): string {
   const source = asRecord(body)
@@ -210,7 +212,11 @@ function clearAuthState() {
 }
 
 /** 带空闲超时的单次 read：超时主动 abort 连接并抛错，定时器保证被清理 */
-function readWithIdleTimeout(reader: ReadableStreamDefaultReader<Uint8Array>, signal: AbortSignal) {
+function readWithIdleTimeout(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  signal: AbortSignal,
+  idleTimeout: number,
+) {
   let timer: ReturnType<typeof setTimeout> | undefined
   return Promise.race([
     reader.read(),
@@ -225,7 +231,7 @@ function readWithIdleTimeout(reader: ReadableStreamDefaultReader<Uint8Array>, si
             // ignore
           }
         }
-      }, IDLE_TIMEOUT)
+      }, idleTimeout)
     }),
   ]).finally(() => {
     if (timer !== undefined) clearTimeout(timer)
@@ -323,9 +329,12 @@ export function streamChat(messages: ChatMessage[], options: StreamChatOptions):
         return false
       }
 
+      // 搜索阶段上游可能长时间不发首包，空闲超时按是否联网搜索取值
+      const idleTimeout = options.webSearch ? WEB_SEARCH_IDLE_TIMEOUT : IDLE_TIMEOUT
+
       let done = false
       while (!done) {
-        const result = await readWithIdleTimeout(reader, controller.signal)
+        const result = await readWithIdleTimeout(reader, controller.signal, idleTimeout)
         if (result.done) break
 
         const { events, rest } = extractSseEvents(buffer + decoder.decode(result.value, { stream: true }))

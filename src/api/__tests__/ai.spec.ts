@@ -143,6 +143,7 @@ describe('normalizeChatMessages', () => {
 describe('streamChat', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
+    vi.useRealTimers()
   })
 
   type StubResponse = {
@@ -330,6 +331,39 @@ describe('streamChat', () => {
     const result = await handle.promise
     expect(result.aborted).toBe(true)
     expect(result.content).toBe('部分')
+  })
+
+  it('空闲超时默认 30s，webSearch 开启放宽到 60s', async () => {
+    vi.useFakeTimers()
+
+    // 默认 30s：29.999s 仍在等待，30s 整触发超时
+    stubFetchSse([])
+    const plain = streamChat([{ role: 'user', content: 'hi' }], { onChunk: () => {} })
+    let plainRejected = false
+    plain.promise.catch(() => {
+      plainRejected = true
+    })
+    await vi.advanceTimersByTimeAsync(29_999)
+    expect(plainRejected).toBe(false)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(plainRejected).toBe(true)
+
+    // webSearch 60s：30s 不触发，60s 整触发
+    stubFetchSse([])
+    const searching = streamChat([{ role: 'user', content: 'hi' }], {
+      onChunk: () => {},
+      webSearch: true,
+    })
+    let searchingRejected = false
+    searching.promise.catch(() => {
+      searchingRejected = true
+    })
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(searchingRejected).toBe(false)
+    await vi.advanceTimersByTimeAsync(29_999)
+    expect(searchingRejected).toBe(false)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(searchingRejected).toBe(true)
   })
 
   it('HTTP 错误时抛出统一响应壳中的 msg', async () => {
