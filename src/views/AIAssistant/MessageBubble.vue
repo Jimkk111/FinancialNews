@@ -68,6 +68,12 @@ function toggleReasoning() {
 const sourcesList = computed(() => props.message.sources ?? [])
 const hasSources = computed(() => sourcesList.value.length > 0)
 
+// 受理后、首个增量前：来源/思考链/正文均未到达的等待态，显示「思考中」
+const isWaiting = computed(
+  () =>
+    isStreaming.value && !props.message.content && !props.message.reasoning && !hasSources.value
+)
+
 // favicon 加载失败后回退到地球图标
 const brokenLogos = ref(new Set<string>())
 function handleLogoError(url: string) {
@@ -183,6 +189,11 @@ function handleRegenerate() {
           </a>
         </div>
 
+        <!-- 等待态：受理后首个增量（来源/思考/正文）到达前 -->
+        <p v-if="!isUser && isWaiting" class="bubble__thinking">
+          思考中<span v-for="i in 3" :key="i" class="bubble__thinking-dot" />
+        </p>
+
         <!-- AI 回复经 renderMarkdown 消毒后渲染，防注入 -->
         <div
           v-if="!isUser"
@@ -191,7 +202,7 @@ function handleRegenerate() {
         />
         <p v-else class="bubble__text">{{ message.content }}</p>
 
-        <span v-if="isStreaming" class="bubble__cursor" />
+        <span v-if="isStreaming && !isWaiting" class="bubble__cursor" />
       </div>
 
       <div class="bubble__footer">
@@ -411,6 +422,30 @@ function handleRegenerate() {
     animation: bubble-blink 1s step-end infinite;
   }
 
+  &__thinking {
+    @include flex(row, flex-start, center);
+    margin: 0;
+    font-size: $fs-base;
+    color: var(--nb-text-tertiary);
+  }
+
+  &__thinking-dot {
+    width: 4px;
+    height: 4px;
+    margin-left: 4px;
+    border-radius: $radius-full;
+    background-color: currentColor;
+    animation: bubble-thinking 1.2s ease-in-out infinite;
+
+    &:nth-of-type(2) {
+      animation-delay: 0.2s;
+    }
+
+    &:nth-of-type(3) {
+      animation-delay: 0.4s;
+    }
+  }
+
   &__footer {
     @include flex(row, flex-start, center, $sp-1);
     margin-top: $sp-1;
@@ -448,6 +483,19 @@ function handleRegenerate() {
   }
   50% {
     opacity: 0;
+  }
+}
+
+@keyframes bubble-thinking {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+  30% {
+    transform: translateY(-3px);
+    opacity: 1;
   }
 }
 </style>

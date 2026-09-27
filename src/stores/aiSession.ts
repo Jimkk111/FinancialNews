@@ -328,6 +328,12 @@ export const useAiSessionStore = defineStore('aiSession', () => {
       const { promise, abort } = startStreamingChat(chatMessages, {
         sessionId: sessionIdValue,
         webSearch: webSearchEnabled.value,
+        // 请求受理（sessionId 事件到达）即建占位消息：
+        // 搜索/思考首包前的静默期气泡显示「思考中」，不再空白
+        onAccepted: () => {
+          if (epoch !== streamEpoch) return
+          ensureMessage()
+        },
         onChunk: (chunk) => {
           if (epoch !== streamEpoch) return
           if (reasoningStartedAt !== null && reasoningSeconds === null) {

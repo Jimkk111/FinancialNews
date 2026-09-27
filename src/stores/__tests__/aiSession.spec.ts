@@ -60,6 +60,7 @@ function createStreamHandle() {
     onChunk: (chunk: string) => capturedOptions?.onChunk(chunk),
     onReasoning: (chunk: string) => capturedOptions?.onReasoning?.(chunk),
     onSources: (batch: AiSource[]) => capturedOptions?.onSources?.(batch),
+    onAccepted: (sessionId: string) => capturedOptions?.onAccepted?.(sessionId),
     resolve: (result: StreamChatResult) => capturedResolve?.(result),
     reject: (error: unknown) => capturedReject?.(error),
     inject: () => {
@@ -251,6 +252,55 @@ describe('useAiSessionStore', () => {
       expect(store.messages[1]!.content).toBe('')
       expect(store.messages[1]!.reasoning).toBe('思考了但没结果')
       expect(store.messages[1]!.status).toBe('complete')
+    })
+
+    it('请求受理即显示思考中占位消息，首增量到达后正常流式', async () => {
+      createSessionMock.mockResolvedValue('sess-1')
+      const stream = createStreamHandle()
+      stream.inject()
+
+      const store = useAiSessionStore()
+      const sending = store.sendMessage('你好')
+      await flushMicrotasks()
+
+      // 受理前只有用户消息
+      expect(store.messages).toHaveLength(1)
+
+      stream.onAccepted('sess-1')
+      await flushMicrotasks()
+      expect(store.messages).toHaveLength(2)
+      expect(store.messages[1]!.role).toBe('assistant')
+      expect(store.messages[1]!.status).toBe('streaming')
+      expect(store.messages[1]!.content).toBe('')
+
+      stream.onReasoning('开始想')
+      stream.onChunk('答')
+      stream.resolve({ content: '答', reasoning: '开始想', sources: [], sessionId: 'sess-1', aborted: false })
+      await sending
+
+      expect(store.messages[1]!.content).toBe('答')
+      expect(store.messages[1]!.status).toBe('complete')
+    })
+
+    it('受理后未收到任何内容即停止则移除占位消息', async () => {
+      createSessionMock.mockResolvedValue('sess-1')
+      const stream = createStreamHandle()
+      stream.inject()
+
+      const store = useAiSessionStore()
+      const sending = store.sendMessage('你好')
+      await flushMicrotasks()
+
+      stream.onAccepted('sess-1')
+      await flushMicrotasks()
+      expect(store.messages).toHaveLength(2)
+
+      store.stopGeneration()
+      stream.resolve({ content: '', reasoning: '', sources: [], aborted: true })
+      await sending
+
+      expect(store.messages).toHaveLength(1)
+      expect(store.messages[0]!.role).toBe('user')
     })
 
     it('联网搜索开关随请求下发并持久化', async () => {

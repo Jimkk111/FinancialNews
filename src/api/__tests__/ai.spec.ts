@@ -297,6 +297,23 @@ describe('streamChat', () => {
     expect(JSON.parse(second.requests[0]!.init!.body as string)).not.toHaveProperty('webSearch')
   })
 
+  it('sessionId 事件触发 onAccepted 受理信号', async () => {
+    stubFetchSse([
+      'data: {"sessionId":"session-9"}\n\n',
+      'data: {"content":"hi"}\n\n',
+      'data: [DONE]\n\n',
+    ])
+
+    const accepted: string[] = []
+    const result = await streamChat([{ role: 'user', content: '你好' }], {
+      onChunk: () => {},
+      onAccepted: (id) => accepted.push(id),
+    }).promise
+
+    expect(accepted).toEqual(['session-9'])
+    expect(result.sessionId).toBe('session-9')
+  })
+
   it('流内 error 事件以 ApiError 抛出，而不是静默成空回复', async () => {
     stubFetchSse(['data: {"error":"AI服务暂时不可用"}\n\n', 'data: [DONE]\n\n'])
 

@@ -174,6 +174,8 @@ export interface StreamChatOptions {
   sessionId?: string
   /** 开启联网搜索（意图识别模式下模型自行判断是否真的搜索） */
   webSearch?: boolean
+  /** 请求受理信号：sessionId 事件到达时触发（新契约在流首，可提前渲染等待态） */
+  onAccepted?: (sessionId: string) => void
   /** 正文增量回调 */
   onChunk: (chunk: string) => void
   /** 思考链增量回调 */
@@ -239,7 +241,7 @@ function readWithIdleTimeout(
 }
 
 export function streamChat(messages: ChatMessage[], options: StreamChatOptions): StreamChatHandle {
-  const { onChunk, onReasoning, onSources } = options
+  const { onChunk, onReasoning, onSources, onAccepted } = options
   const controller = new AbortController()
 
   const promise = (async (): Promise<StreamChatResult> => {
@@ -321,6 +323,7 @@ export function streamChat(messages: ChatMessage[], options: StreamChatOptions):
             }
             if (typeof parsed.sessionId === 'string' && parsed.sessionId) {
               receivedSessionId = parsed.sessionId
+              onAccepted?.(parsed.sessionId)
             }
           } catch {
             // 非 JSON 的 data 行，跳过
