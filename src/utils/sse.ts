@@ -8,7 +8,9 @@ export function extractSseEvents(
   text: string,
   final = false,
 ): { events: string[]; rest: string } {
+  // 一个data行以\n结尾
   const lines = text.split('\n')
+  // 不完整行，用于更新buffer，留待下一轮处理
   const rest = final ? '' : (lines.pop() ?? '')
 
   const events: string[] = []
