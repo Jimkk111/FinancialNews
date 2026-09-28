@@ -24,7 +24,7 @@ import {
 } from '@/services/userService'
 import { formatTime } from '@/utils/format'
 import ArticleContent from '@/components/content/ArticleContent.vue'
-import { htmlToBlocks } from '@/utils/content/htmlToBlocks'
+import { normalizeContent } from '@/utils/content/validateContent'
 import { useAuthStore } from '@/stores/auth'
 import type { NewsDetail as NewsType, NewsItem } from '@/types'
 
@@ -149,8 +149,8 @@ const loadRelatedNews = async (currentNews: NewsType) => {
   }
 }
 
-// 后端 content 目前仍为 HTML 字符串，转成块级 JSON 后再渲染
-const contentBlocks = computed(() => (news.value ? htmlToBlocks(news.value.content) : []))
+// 后端正文已是块级 JSON，过一遍白名单归一化兜底后再渲染
+const contentBlocks = computed(() => (news.value ? normalizeContent(news.value.content) : []))
 
 const fetchNewsDetail = async () => {
   try {

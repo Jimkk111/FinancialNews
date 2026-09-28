@@ -15,8 +15,7 @@ import {
 import { getNewsCategories } from '@/services/newsService'
 import type { Category } from '@/types'
 import type { ArticleContent } from '@/types/content'
-import { htmlToBlocks } from '@/utils/content/htmlToBlocks'
-import { blocksToHtml } from '@/utils/content/blocksToHtml'
+import { normalizeContent } from '@/utils/content/validateContent'
 
 const router = useRouter()
 const route = useRoute()
@@ -77,7 +76,7 @@ const loadDraft = async () => {
     coverImage.value = draft.coverImage
     selectedCategory.value = draft.categoryId
     selectedTags.value = draft.tags ?? []
-    content.value = htmlToBlocks(draft.content || '')
+    content.value = normalizeContent(draft.content)
     lastSavedSnapshot = buildSnapshot()
   }
 }
@@ -97,7 +96,7 @@ const saveDraft = async (showSuccess = true) => {
 
   const payload = {
     title: title.value || '未命名草稿',
-    content: blocksToHtml(content.value),
+    content: content.value,
     coverImage: coverImage.value,
     categoryId: selectedCategory.value,
     tags: selectedTags.value,

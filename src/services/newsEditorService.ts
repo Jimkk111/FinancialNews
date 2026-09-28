@@ -1,4 +1,5 @@
 import type { ApiResponse, NewsDraft, PublishedNews, PaginationInfo } from '@/types'
+import type { ArticleContent } from '@/types/content'
 import type { PaginatedResponse } from '@/api/request'
 import * as draftApi from '@/api/draft'
 
@@ -107,7 +108,7 @@ export async function getDraft(id: string): Promise<ApiResponse<NewsDraft>> {
 
 export async function createDraftService(draft: {
   title: string
-  content?: string | null
+  content?: ArticleContent | null
   coverImage?: string | null
   categoryId?: number | null
   tags?: number[]
@@ -126,7 +127,7 @@ export async function createDraftService(draft: {
 
 export async function updateDraftService(id: string, draft: {
   title?: string
-  content?: string | null
+  content?: ArticleContent | null
   coverImage?: string | null
   categoryId?: number | null
   tags?: number[]

@@ -1,3 +1,5 @@
+import type { ArticleContent } from './content'
+
 export interface Category {
   id: number
   name: string
@@ -12,7 +14,7 @@ export interface NewsItem {
   id: number
   title: string
   summary?: string
-  content: string
+  content: ArticleContent
   source: string | null
   publishTime: string | null
   views: number
@@ -60,7 +62,7 @@ export interface SearchResponse {
 export interface NewsDraft {
   id: string
   title: string
-  content: string | null
+  content: ArticleContent | null
   coverImage: string | null
   categoryId: number | null
   tags?: number[]

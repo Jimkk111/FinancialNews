@@ -8,7 +8,7 @@ import { normalizeContent, normalizeHeadingLevel } from './validateContent'
  *
  * 这里只做「形状映射」：节点类型 / attrs 重命名、codeBlock 文本拼接、列表扁平化。
  * marks 白名单、URL 校验、空列表项过滤等合法性归一化统一收敛到末端的
- * normalizeContent —— 与 htmlToBlocks、AI 结构化输出共用同一套兜底。
+ * normalizeContent —— 与 AI 结构化输出共用同一套兜底。
  */
 
 function inlineChildren(node: JSONContent): Inline[] {
@@ -34,8 +34,7 @@ function listItems(node: JSONContent): ListItem[] {
   return items
 }
 
-// v1 扁平化策略（与 htmlToBlocks 的 li 处理保持一致）：按文档序提取 li 内全部
-// 文本，嵌套列表内容并入当前项，不展开层级
+// v1 扁平化策略：按文档序提取 li 内全部文本，嵌套列表内容并入当前项，不展开层级
 function flattenListItem(li: JSONContent): Inline[] {
   const out: Inline[] = []
   for (const child of li.content ?? []) {
