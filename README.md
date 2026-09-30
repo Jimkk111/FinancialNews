@@ -242,6 +242,25 @@ server: {
 - **vendor chunk 拆分**：Tiptap 编辑器（`vendor-tiptap`）和 Lucide 图标（`vendor-icons`）拆为独立 chunk
 - **虚拟滚动**：新闻列表使用 `DynamicScroller` 仅渲染可视区域 DOM
 
+## CI/CD
+
+基于 GitHub Actions，分为两个工作流：
+
+- **CI**（[`.github/workflows/ci.yml`](.github/workflows/ci.yml)）：推送到任意分支或向 `master` 提 PR 时，自动执行 依赖安装（npm + Node 22，带缓存，与服务器镜像构建同一依赖体系）→ 类型检查 → 单元测试（Vitest）→ 生产构建，并上传 `dist` 构建产物
+- **CD**（[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)）：推送到 `master`（或在 Actions 页面手动触发 `workflow_dispatch`，可部署任意分支）时，先执行与 CI 相同的构建校验，通过后通过 SSH 登录服务器，拉取最新代码并执行 `docker compose up -d --build` 重建容器
+
+首次使用 CD 前，需在仓库 **Settings → Secrets and variables → Actions** 中配置：
+
+| Secret | 必填 | 说明 |
+| --- | --- | --- |
+| `SSH_HOST` | 是 | 服务器地址 |
+| `SSH_USER` | 是 | SSH 用户名 |
+| `SSH_PRIVATE_KEY` | 是 | SSH 私钥（对应服务器 `authorized_keys` 中的公钥） |
+| `SSH_PORT` | 否 | SSH 端口，默认 22 |
+| `DEPLOY_DIR` | 否 | 服务器上仓库路径，默认 `/opt/financial-news` |
+
+> 注意：服务器上的仓库需具备 `git fetch origin` 的拉取权限，且已安装 Docker 和 Compose 插件（可先运行一次 [`deploy.sh`](deploy.sh) 完成环境初始化）。
+
 ## 浏览器支持
 
 支持所有现代浏览器（ES Module 兼容）。
