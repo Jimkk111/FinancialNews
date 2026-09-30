@@ -51,9 +51,10 @@ jobs:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          if [ -z "$SSH_HOST" ] || [ -z "$SSH_USER" ] || [ -z "$SSH_PRIVATE_KEY" ]; then
-            echo "::error::缺少部署密钥。请在仓库 Settings → Secrets and variables → Actions 中配置 SSH_HOST、SSH_USER、SSH_PRIVATE_KEY（可选 SSH_PORT、DEPLOY_DIR）"
+          if [ -z "$SSH_HOST" ] || [ -z "$SSH_USER" ] || [ -z "$SSH_PRIVATE_KEY" ] || [ -z "$DEPLOY_PATH" ]; then
+            echo "::error::缺少部署密钥。请在仓库 Settings → Secrets and variables → Actions 中配置 SSH_HOST、SSH_USER、SSH_PRIVATE_KEY、DEPLOY_PATH（可选 SSH_PORT）"
             exit 1
           fi
 
@@ -66,7 +67,7 @@ jobs:
           port: ${{ secrets.SSH_PORT || 22 }}
           script: |
             set -e
-            cd ${{ secrets.DEPLOY_DIR || '/opt/financial-news' }}
+            cd "${{ secrets.DEPLOY_PATH }}" || { echo "部署失败：服务器上不存在目录 ${{ secrets.DEPLOY_PATH }}，请检查 DEPLOY_PATH 是否为仓库实际路径"; exit 1; }
             echo "[1/3] 拉取最新代码（${{ github.ref_name }}）..."
             git fetch origin
             git checkout ${{ github.ref_name }}

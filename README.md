@@ -257,7 +257,7 @@ server: {
 | `SSH_USER` | 是 | SSH 用户名 |
 | `SSH_PRIVATE_KEY` | 是 | SSH 私钥（对应服务器 `authorized_keys` 中的公钥） |
 | `SSH_PORT` | 否 | SSH 端口，默认 22 |
-| `DEPLOY_DIR` | 否 | 服务器上仓库路径，默认 `/opt/financial-news` |
+| `DEPLOY_PATH` | 是 | 服务器上仓库路径（包含 `docker-compose.yml` 的目录） |
 
 > 注意：服务器上的仓库需具备 `git fetch origin` 的拉取权限，且已安装 Docker 和 Compose 插件（可先运行一次 [`deploy.sh`](deploy.sh) 完成环境初始化）。
 
